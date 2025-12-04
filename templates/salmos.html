@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Salmos e Cifras Sacras</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" type="image/x-icon">
+  <style>
+    body {
+      background: #faf7f1;
+      font-family: "Georgia", serif;
+      color: #4a3820;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      line-height: 1.8;
+    }
+
+    header {
+      background: #fffef8;
+      color: #6a4f28;
+      text-align: center;
+      padding: 2rem 1rem;
+      border-bottom: 3px solid #d4af37;
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      margin: 0;
+      letter-spacing: 2px;
+      text-shadow: 1px 1px 2px #bfa036;
+      color: #6a4f28;
+      font-weight: 900;
+    }
+
+    header p {
+      margin-top: 0.5rem;
+      font-style: italic;
+      color: #7f6b3b;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    .imagem-cristo {
+      text-align: center;
+      margin: 2rem 0;
+    }
+
+    .imagem-cristo img {
+      max-width: 200px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+      border: 3px solid gold;
+    }
+
+    .titulo-liturgia {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: bold;
+      color: #6a4f28;
+      margin: 1.5rem 0;
+      font-family: "Georgia", serif;
+      display: none; /* Oculta o título repetido */
+    }
+
+    .salmo-item {
+      background-color: #fffef8;
+      margin-bottom: 1.5rem;
+      padding: 1.5rem;
+      border-left: 5px solid #d4af37;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+      transition: box-shadow 0.3s ease;
+    }
+
+    .salmo-item:hover {
+      box-shadow: 0 0 18px rgba(212, 175, 55, 0.35);
+    }
+
+    .salmo-nome {
+      font-size: 1.6rem;
+      color: #4a3820;
+      margin: 0 0 0.8rem 0;
+      font-weight: 900;
+      font-family: "Georgia", serif;
+      text-shadow: 0 0 4px #bfa036;
+    }
+
+    /* Player personalizado */
+    .audio-player {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background-color: #f0e6d2;
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid #d4af37;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: inset 0 0 5px rgba(212,175,55,0.2);
+    }
+
+    .play-btn {
+      background-color: goldenrod;
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .play-btn:hover {
+      background-color: #bfa036;
+      transform: scale(1.1);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .audio-info {
+      flex: 1;
+      font-size: 0.95rem;
+      color: #4a3820;
+    }
+
+    .loading {
+      display: none;
+      color: #8B4513;
+      font-style: italic;
+      margin-left: 10px;
+    }
+
+    .download-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      justify-content: center;
+    }
+
+    .botao-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      background-color: #f0e6d2;
+      color: #8B4513;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border-radius: 8px;
+      border: 1px solid #d4af37;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .botao-download:hover {
+      background-color: #d4af37;
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .botao-download i {
+      margin-right: 6px;
+      font-size: 1.1em;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #7f6b3b;
+      font-style: italic;
+      padding: 3rem;
+      background-color: #fffef8;
+      border-radius: 12px;
+      border-left: 5px solid #d4af37;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      margin-top: 3rem;
+      color: #7f6b3b;
+      font-size: 0.9rem;
+      border-top: 1px solid #d4af37;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🎵 Salmos e Cifras Sacras</h1>
+    <p>Para Adoração, Liturgia e Oração Contínua</p>
+  </header>
+
+  <div class="container">
+    <!-- Imagem centralizada do Cristo Pantocrator -->
+    <div class="imagem-cristo">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    
+    <!-- Título abaixo da imagem (oculto para evitar repetição) -->
+    <div class="titulo-liturgia">Salmos e Cifras Sacras</div>
+
+    {% if salmos %}
+      {% for salmo in salmos %}
+        <div class="salmo-item">
+          <h3 class="salmo-nome">{{ salmo['nome'] }}</h3>
+
+          <!-- Player personalizado -->
+          <div class="audio-player">
+            <button class="play-btn" onclick="togglePlay(this, '{{ url_for('play_salmo', filename=salmo.filename) }}')">
+              ▶
+            </button>
+            <div class="audio-info">
+              <div>{{ salmo.nome }}</div>
+              <div class="loading" id="loading-{{ salmo['id'] }}">Carregando...</div>
+            </div>
+          </div>
+
+          <!-- Botões de download -->
+          <div class="download-group">
+            <a href="{{ url_for('download_mp3', filename=salmo.filename) }}" class="botao-download">
+              <i>⬇️</i> Baixar MP3
+            </a>
+            <a href="{{ url_for('download_doc', filename=salmo.filename) }}" class="botao-download">
+              <i>📄</i> Baixar Cifra
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <p>Nenhum salmo disponível no momento.</p>
+      </div>
+    {% endif %}
+
+  </div>
+
+  <script>
+    function togglePlay(button, streamUrl) {
+      // Encontra o player de áudio atual
+      const container = button.closest('.audio-player');
+      const loading = container.querySelector('.loading');
+      let audio = container.querySelector('audio');
+
+      if (!audio) {
+        // Primeiro clique: cria o áudio
+        audio = new Audio();
+        container.appendChild(audio);
+        audio.src = streamUrl;
+
+        // Mostra loading
+        loading.style.display = 'block';
+
+        audio.oncanplay = () => {
+          loading.style.display = 'none';
+          audio.play();
+          button.innerHTML = '❚❚';
+        };
+
+        audio.onerror = () => {
+          loading.style.display = 'none';
+          alert('Erro ao carregar o áudio. Tente novamente.');
+        };
+
+        audio.onended = () => {
+          button.innerHTML = '▶';
+        };
+
+      } else if (audio.paused) {
+        // Continua reprodução
+        loading.style.display = 'block';
+        audio.play().then(() => {
+          loading.style.display = 'none';
+          button.innerHTML = '❚❚';
+        }).catch(err => {
+          loading.style.display = 'none';
+          console.error("Erro ao reproduzir:", err);
+          alert("Falha ao reproduzir áudio.");
+        });
+      } else {
+        // Pausa
+        audio.pause();
+        button.innerHTML = '▶';
+      }
+    }
+  </script>
+
+  <footer>
+    &copy; {{ ano }} Portal da Música Católica.<br>
+    "Teu amor, Senhor, é eterno: não abandones a obra das tuas mãos." — Salmo 137(138),8
+  </footer>
+
+</body>
+</html>

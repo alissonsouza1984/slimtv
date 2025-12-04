@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ titulo }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" type="image/x-icon">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    body.page-body {
+      background: #faf7f1;
+      font-family: "Georgia", serif;
+      color: #4a3820;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0 1rem;
+    }
+    .container.my-5 {
+      max-width: 900px;
+      margin: 2rem auto 3rem auto;
+      background: #fffef8;
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+      padding: 2rem 3rem;
+      border-left: 6px solid #d4af37;
+    }
+    @media (max-width: 768px) {
+      .container.my-5 {
+        margin: 1rem auto 2rem auto;
+        padding: 1rem;
+        border-left-width: 4px;
+      }
+    }
+    /* Título principal */
+    .titulo-dia {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #6a4f28;
+      text-align: center;
+      margin-bottom: 0.5rem;
+      font-family: "Times New Roman", serif;
+      text-shadow: 1px 1px 2px #bfa036;
+    }
+    .subtitulo {
+      font-style: italic;
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #7f6b3b;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+    @media (max-width: 768px) {
+      .titulo-dia {
+        font-size: 1.8rem;
+      }
+      .subtitulo {
+        font-size: 0.9rem;
+      }
+    }
+    /* Cards das leituras e orações */
+    .card-liturgia {
+      margin-bottom: 2rem;
+      border-left: 5px solid #d4af37;
+      background-color: #fffef8;
+      padding: 1.5rem;
+      border-radius: 12px;
+      font-size: 1.2rem;
+      line-height: 1.6;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+      transition: box-shadow 0.3s ease;
+      position: relative;
+    }
+    .card-liturgia:hover {
+      box-shadow: 0 0 18px rgba(212, 175, 55, 0.35);
+    }
+    .card-liturgia h3 {
+      color: #4a3820;
+      font-weight: 900;
+      font-size: 1.6rem;
+      margin-bottom: 0.8rem;
+      font-family: "Georgia", serif;
+      text-shadow: 0 0 4px #bfa036;
+    }
+    @media (max-width: 768px) {
+      .card-liturgia {
+        padding: 1rem;
+        font-size: 1rem;
+      }
+      .card-liturgia h3 {
+        font-size: 1.2rem;
+      }
+    }
+    /* Botão copiar - ESTILO IDÊNTICO AO COMPARTILHAR */
+    .btn-copiar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.2rem;
+      background-color: #c4a15a;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.3s ease;
+      font-family: "Georgia", serif;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .btn-copiar:hover {
+      background-color: #a27d3a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .btn-copiar:active {
+      transform: scale(0.95);
+    }
+    .btn-copiar .icon {
+      font-size: 1.2rem;
+    }
+
+    /* Botão compartilhar - ESTILO IDÊNTICO AO COPIAR */
+    .btn-compartilhar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 1.2rem;
+      background-color: #c4a15a;
+      color: white;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.3s ease;
+      font-family: "Georgia", serif;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .btn-compartilhar:hover {
+      background-color: #a27d3a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .btn-compartilhar:active {
+      transform: scale(0.95);
+    }
+    .btn-compartilhar .icon {
+      font-size: 1.2rem;
+    }
+
+    /* Link voltar */
+    .back-link {
+      display: inline-block;
+      margin-top: 1.5rem;
+      color: #4a3820;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1.1rem;
+      font-family: "Georgia", serif;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.3s ease;
+    }
+    .back-link:hover {
+      border-color: #d4af37;
+      text-decoration: none;
+    }
+    /* Player de áudio estilizado */
+    .audio-player audio {
+      width: 100%;
+      border-radius: 12px;
+      outline: none;
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+      cursor: pointer;
+      transition: box-shadow 0.3s ease;
+    }
+    .audio-player audio:hover,
+    .audio-player audio:focus {
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.8);
+    }
+    /* Lista de áudios */
+    .lista-audios {
+      margin: 1rem 0;
+    }
+    .item-audio {
+      margin-bottom: 1.5rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid #e0d8c8;
+      border-radius: 12px;
+      background-color: #fffef8;
+      box-shadow: inset 0 0 5px rgba(212,175,55,0.1);
+    }
+    .item-audio strong {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-family: "Georgia", serif;
+      color: #6a4f28;
+      font-weight: 700;
+    }
+    .botoes-download {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .botoes-download a {
+      margin-right: 1rem;
+      color: #8B4513;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .botoes-download a:last-child {
+      margin-right: 0;
+    }
+    .botoes-download a:hover {
+      text-decoration: underline;
+    }
+    /* Alerta API */
+    .alerta-api {
+      max-width: 720px;
+      margin: 1rem auto 2rem auto;
+      padding: 1rem 1.5rem;
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      border-radius: 12px;
+      color: #856404;
+      font-weight: 600;
+      text-align: center;
+      font-family: "Georgia", serif;
+      box-shadow: 0 0 10px rgba(212,175,55,0.4);
+    }
+    /* Calendário integrado */
+    .calendario-container {
+      background: rgba(255, 215, 0, 0.12);
+      border: 2px solid #d4af37;
+      border-radius: 16px;
+      padding: 20px 25px;
+      max-width: 480px;
+      margin: 40px auto 20px auto;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.35);
+      font-family: "Georgia", serif;
+      display: none; /* Oculto por padrão */
+    }
+    .calendario-container.visivel {
+      display: block;
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .calendario-container h2 {
+      color: goldenrod;
+      font-weight: 900;
+      margin-bottom: 20px;
+      font-size: 1.7rem;
+      text-shadow: 0 0 5px #bfa036;
+    }
+    .calendario-container input[type="date"] {
+      padding: 12px 15px;
+      border: 2px solid #d4af37;
+      border-radius: 12px;
+      background-color: rgba(255, 255, 255, 0.95);
+      font-size: 1.1rem;
+      color: #4a3820;
+      width: 65%;
+      box-sizing: border-box;
+      transition: border-color 0.3s ease;
+      font-family: "Georgia", serif;
+    }
+    .calendario-container input[type="date"]:focus {
+      border-color: goldenrod;
+      outline: none;
+      box-shadow: 0 0 10px rgba(139, 69, 19, 0.6);
+    }
+    .calendario-container button {
+      margin-left: 12px;
+      padding: 12px 25px;
+      background-color: goldenrod;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      color: white;
+      font-weight: 900;
+      font-size: 1.1rem;
+      font-family: "Georgia", serif;
+      transition: background-color 0.3s ease;
+      box-shadow: 0 0 10px #bfa036;
+    }
+    .calendario-container button:hover {
+      background-color: #bfa036;
+      box-shadow: 0 0 18px #d4af37;
+    }
+    /* Botão principal para toggle calendário - Estilo Hacker Católico */
+    #btnToggleCalendario {
+      background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%);
+      color: #f0c987;
+      font-weight: 900;
+      padding: 14px 32px;
+      border: 2px solid #d4af37;
+      border-radius: 12px;
+      cursor: pointer;
+      font-family: "Courier New", monospace;
+      font-size: 1.3rem;
+      box-shadow: 0 6px 15px rgba(44, 62, 80, 0.5);
+      transition: all 0.3s ease;
+      display: block;
+      margin: 3rem auto 2rem auto;
+      max-width: 350px;
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 1px;
+    }
+    #btnToggleCalendario:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(44, 62, 80, 0.7);
+      background: linear-gradient(135deg, #1a2530 0%, #2c3e50 100%);
+      color: #ffd700;
+    }
+    #btnToggleCalendario:active {
+      transform: translateY(1px);
+    }
+    #btnToggleCalendario::before {
+      content: ">>> ";
+      font-weight: bold;
+    }
+    #btnToggleCalendario.ocultar::before {
+      content: "<<< ";
+    }
+    /* Botão para ocultar calendário */
+    #btnOcultarCalendario {
+      background: linear-gradient(135deg, #8B4513 0%, #6b3a0f 100%);
+      color: #fffef8;
+      font-weight: 700;
+      padding: 8px 20px;
+      border: 1px solid #d4af37;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: "Courier New", monospace;
+      font-size: 0.9rem;
+      margin-top: 15px;
+      transition: all 0.3s ease;
+      letter-spacing: 1px;
+    }
+    #btnOcultarCalendario:hover {
+      background: linear-gradient(135deg, #6b3a0f 0%, #8B4513 100%);
+      box-shadow: 0 0 10px rgba(139, 69, 19, 0.5);
+    }
+    /* Botão de compartilhar redes sociais */
+    .social-share {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px dashed #d4af37;
+    }
+    .share-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .share-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: white;
+      font-size: 18px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+    }
+    .share-button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .share-facebook { background-color: #3b5998; }
+    .share-twitter { background-color: #1da1f2; }
+    .share-whatsapp { background-color: #25d366; }
+    .share-telegram { background-color: #0088cc; }
+    .share-copy { background-color: #6c757d; }
+    /* Mensagem de confirmação */
+    .msg-confirmacao {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #4CAF50;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      font-weight: bold;
+      z-index: 10000;
+      display: none;
+      animation: slideIn 0.3s, fadeOut 0.5s 2.5s;
+      font-size: 0.9rem;
+      max-width: 300px;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    @media (max-width: 768px) {
+      .msg-confirmacao {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        padding: 12px 20px;
+        font-size: 0.8rem;
+      }
+    }
+    /* Canvas oculto para captura */
+    #canvas {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+    }
+    /* Imagem do Cristo Pantocrator */
+    .imagem-cristo {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .imagem-cristo img {
+      max-width: 200px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+      border: 3px solid gold;
+    }
+    .titulo-liturgia {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: bold;
+      color: #6a4f28;
+      margin: 1.5rem 0;
+      font-family: "Georgia", serif;
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .imagem-cristo img {
+        max-width: 150px;
+      }
+      .titulo-liturgia {
+        font-size: 1.6rem;
+      }
+    }
+    /* Legenda */
+    .legenda {
+      text-align: center;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #5b3e19;
+    }
+    .footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #888;
+    }
+    /* Estilo para o conteúdo da captura - Instagram */
+    .captura-conteudo {
+      border: 15px solid #d4af37;
+      box-shadow: 0 0 15px #bfa14a88;
+      border-radius: 12px;
+      background-color: #fffef8;
+      width: 1080px;
+      height: 1080px;
+      padding: 30px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      font-family: "Georgia", serif;
+      color: #222;
+      overflow: hidden;
+      position: relative;
+    }
+    .captura-topo {
+      flex: 0 0 auto;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .captura-titulo {
+      font-weight: 900;
+      font-size: 3.2rem;
+      margin-bottom: 10px;
+      color: #4a3820;
+      text-shadow: 2px 2px 4px rgba(212, 175, 55, 0.3);
+      line-height: 1.2;
+    }
+    .captura-texto {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-align: justify;
+      line-height: 1.6;
+      font-size: 2.6rem;
+      margin-bottom: 30px;
+      padding-right: 10px;
+      font-weight: 500;
+      color: #2c2c2c;
+      padding-bottom: 20px;
+    }
+    .captura-conteudo h3 {
+      margin-bottom: 15px;
+      font-weight: 900;
+      font-size: 3.2rem;
+      text-align: center;
+      color: #4a3820;
+      text-shadow: 2px 2px 4px rgba(212, 175, 55, 0.3);
+      line-height: 1.2;
+    }
+    .captura-conteudo p {
+      margin-bottom: 15px;
+      text-align: justify;
+      line-height: 1.6;
+      font-size: 2.6rem;
+      word-break: break-word;
+      font-weight: 500;
+      color: #2c2c2c;
+    }
+    .captura-conteudo strong {
+      font-weight: 900;
+      color: #1a1a1a;
+    }
+    .captura-conteudo em {
+      font-style: italic;
+      color: #4a3820;
+    }
+    .captura-footer {
+      flex: 0 0 auto;
+      font-size: 1.3rem;
+      color: #666;
+      border-top: 2px solid #d4af37;
+      padding-top: 12px;
+      text-align: center;
+      font-weight: 600;
+      margin-top: auto;
+    }
+    .captura-footer a.captura-link {
+      color: #8B4513;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .captura-imagem-pequena {
+      width: 100px;
+      height: auto;
+      margin: 0 auto 15px auto;
+      display: block;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+    }
+    .indicador-pagina {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      background: rgba(212, 175, 55, 0.9);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .progresso-compartilhamento {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      z-index: 10001;
+      display: none;
+      text-align: center;
+    }
+    .progresso-barra {
+      width: 300px;
+      height: 20px;
+      background: #333;
+      border-radius: 10px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .progresso-preenchimento {
+      height: 100%;
+      background: linear-gradient(90deg, #d4af37, #ffd700);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .modal-multiplas-imagens {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 10002;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-conteudo {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    .modal-titulo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #4a3820;
+      margin-bottom: 15px;
+    }
+    .modal-texto {
+      font-size: 1rem;
+      color: #666;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .modal-botoes {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .modal-botao {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      min-width: 120px;
+    }
+    .modal-botao.primario {
+      background: #c4a15a;
+      color: white;
+    }
+    .modal-botao.primario:hover {
+      background: #a27d3a;
+    }
+    .modal-botao.secundario {
+      background: #f0f0f0;
+      color: #666;
+    }
+    .modal-botao.secundario:hover {
+      background: #e0e0e0;
+    }
+    .preview-imagens {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 15px 0;
+      flex-wrap: wrap;
+    }
+    .preview-imagem {
+      width: 80px;
+      height: 80px;
+      border: 2px solid #d4af37;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+    }
+    .preview-imagem:hover {
+      transform: scale(1.1);
+    }
+  </style>
+</head>
+<body class="page-body">
+  <div class="container my-5">
+    {% if api_falhou %}
+    <div class="alerta-api" role="alert" aria-live="assertive">
+      ⚠️ Não foi possível carregar os dados litúrgicos para esta data. Exibindo conteúdo padrão.
+    </div>
+    {% endif %}
+    <div class="imagem-cristo">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    <div class="titulo-liturgia">Liturgia Diária</div>
+    <div class="titulo-dia">{{ titulo }}</div>
+    <div class="subtitulo">Cor Litúrgica: {{ cor }} — {{ data }}</div>
+    {% if antifona_entrada %}
+    <div class="card-liturgia" role="region" aria-label="Antífona de Entrada" data-titulo="Antífona de Entrada" id="areaCompartilhar1">
+      <h3 id="antifona-entrada"><i class="fas fa-cross icon"></i> Antífona de Entrada</h3>
+      <p>A Rainha está à vossa direita com suas vestes de ouro, ornada de esplendor. (Cf. Sl 44, 10)</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(1)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(1)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    {% endif %}
+    <div class="card-liturgia" role="region" aria-label="Oração do Dia" data-titulo="Oração do Dia" id="areaCompartilhar2">
+      <h3 id="oracao-dia"><i class="fas fa-pray icon"></i> Oração do Dia</h3>
+      <p>Ó Deus, fizestes a Mãe do vosso Filho nossa Mãe e Rainha; concedei-nos propício que, apoiados por sua intercessão, alcancemos no reino do céu a glória dos vossos filhos e filhas. Por nosso Senhor Jesus Cristo, vosso Filho, que é Deus, e convosco vive e reina, na unidade do Espírito Santo, por todos os séculos dos séculos.</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(2)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(2)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    <div class="card-liturgia" role="region" aria-label="Primeira Leitura" data-titulo="Primeira Leitura" id="areaCompartilhar3">
+      <h3 id="primeira-leitura"><i class="fas fa-book icon"></i> Primeira Leitura</h3>
+      <p><strong>Is 9, 1-6</strong>  – Leitura do Livro do Profeta Isaías<br>1O povo, que andava na escuridão, viu uma grande luz; para os que habitavam nas sombras da morte, uma luz resplandeceu. 2Fizeste crescer a alegria, e aumentaste a felicidade; todos se regozijam em tua presença como alegres ceifeiros na colheita, ou como exaltados guerreiros ao dividirem os despojos. 3Pois o jugo que oprimia o povo, — a carga sobre os ombros, o orgulho dos fiscais — tu os abateste como na jornada de Madiã. 4Botas de tropa de assalto, trajes manchados de sangue, tudo será queimado e devorado pelas chamas. 5Porque nasceu para nós um menino, foi-nos dado um filho; ele traz aos ombros a marca da realeza; o nome que lhe foi dado é: Conselheiro admirável, Deus forte, Pai dos tempos futuros, Príncipe da Paz. 6Grande será o seu reino e a paz não há de ter fim sobre o trono de Davi e sobre o seu reinado, que ele irá consolidar e confirmar em justiça e santidade, a partir de agora e para todo o sempre. O amor zeloso do Senhor dos exércitos há de realizar estas coisas.</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(3)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(3)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    <div class="card-liturgia" role="region" aria-label="Salmo Responsorial do Dia" data-titulo="Salmo Responsorial do Dia" id="areaCompartilhar5">
+      <h3 id="salmo-responsorial"><i class="fas fa-music icon"></i> Salmo Responsorial do Dia</h3>
+      <p><strong>Sl 112</strong></p>
+      <p><em>Refrão: Bendito seja o nome do Senhor, agora e por toda a eternidade!</em></p>
+      <p>— Louvai, louvai, ó servos do Senhor, louvai, louvai o nome do Senhor! Bendito seja o nome do Senhor, agora e por toda a eternidade!<br>— Do nascer do sol até o seu ocaso, louvado seja o nome do Senhor! O Senhor está acima das nações, sua glória vai além dos altos céus.<br>— Quem pode comparar-se ao nosso Deus, ao Senhor, que no alto céu tem o seu trono e se inclina para olhar o céu e a terra?<br>— Levanta da poeira o indigente e do lixo ele retira o pobrezinho, para fazê-lo assentar-se com os nobres, assentar-se com os nobres do seu povo</p>
+      <div class="lista-audios">
+        <p><small>🔊 Clique para ouvir e escolher a versão:</small></p>
+        {% for salmo_audio in salmos_do_dia %}
+        <div class="item-audio">
+          <strong>{{ formatar_nome_salmo(salmo_audio.filename) }}</strong>
+          <div class="audio-player">
+            <audio controls preload="none" style="border-radius: 12px;">
+              <source src="{{ url_for('play_salmo', filename=salmo_audio.filename) }}" type="audio/mpeg" />
+              Seu navegador não suporta áudio.
+            </audio>
+          </div>
+          <div class="botoes-download" role="group" aria-label="Botões para baixar áudio e cifra">
+            <a href="{{ url_for('download_mp3', filename=salmo_audio.filename) }}">⬇️ Baixar MP3</a>
+            <a href="{{ url_for('download_doc', filename=salmo_audio.filename) }}">📄 Baixar Cifra</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(5)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(5)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    {% if segunda_leitura and "Não há" not in segunda_leitura %}
+    <div class="card-liturgia" role="region" aria-label="Segunda Leitura" data-titulo="Segunda Leitura" id="areaCompartilhar4">
+      <h3 id="segunda-leitura"><i class="fas fa-book-open icon"></i> Segunda Leitura</h3>
+      <p>{{ segunda_leitura | safe }}</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(4)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(4)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    {% endif %}
+    <div class="card-liturgia" role="region" aria-label="Evangelho" data-titulo="Evangelho" id="areaCompartilhar6">
+      <h3 id="evangelho"><i class="fas fa-cross icon"></i> Evangelho</h3>
+      <p><strong>Lc 1, 26-38</strong>  – Proclamação do Evangelho de Jesus Cristo ✠ segundo Lucas<br>Naquele tempo, 26o anjo Gabriel foi enviado por Deus a uma cidade da Galileia, chamada Nazaré, 27a uma virgem, prometida em casamento a um homem chamado José. Ele era descendente de Davi e o nome da Virgem era Maria.28O anjo entrou onde ela estava e disse: “Alegra-te, cheia de graça, o Senhor está contigo!” 29Maria ficou perturbada com estas palavras e começou a pensar qual seria o significado da saudação.30O anjo, então, disse-lhe: “Não tenhas medo, Maria, porque encontraste graça diante de Deus. 31Eis que conceberás e darás à luz um filho, a quem porás o nome de Jesus. 32Ele será grande, será chamado Filho do Altíssimo, e o Senhor Deus lhe dará o trono de seu pai Davi. 33Ele reinará para sempre sobre os descendentes de Jacó, e o seu reino não terá fim”.34Maria perguntou ao anjo: “Como acontecerá isso, se eu não conheço homem algum?” 35O anjo respondeu: “O Espírito virá sobre ti, e o poder do Altíssimo te cobrirá com sua sombra. Por isso, o menino que vai nascer será chamado Santo, Filho de Deus. 36Também Isabel, tua parenta, concebeu um filho na velhice. Este já é o sexto mês daquela que era considerada estéril, 37porque para Deus nada é impossível”. 38Maria, então, disse: “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra!” E o anjo retirou-se.</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(6)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(6)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    <div class="card-liturgia" role="region" aria-label="Ofertório" data-titulo="Ofertório" id="areaCompartilhar7">
+      <h3 id="ofertorio"><i class="fas fa-dove icon"></i> Ofertório</h3>
+      <p>Senhor, celebrando a memória da Santa Virgem Maria, nós vos trazemos estas oferendas; venha em nosso auxílio o vosso Filho feito homem, que a vós se ofereceu na cruz como sacrifício sem mancha. Por Cristo, nosso Senhor.</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(7)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(7)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    <div class="card-liturgia" role="region" aria-label="Comunhão" data-titulo="Comunhão" id="areaCompartilhar8">
+      <h3 id="comunhao"><i class="fas fa-heart icon"></i> Comunhão</h3>
+      <p>Senhor, alimentados pelo sacramento celeste, suplicantes vos pedimos que, ao venerarmos a Virgem Maria, na celebração de sua memória, mereçamos participar eternamente do banquete do vosso Reino. Por Cristo, nosso Senhor.</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(8)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(8)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    {% if antifona_comunhao %}
+    <div class="card-liturgia" role="region" aria-label="Antífona de Comunhão" data-titulo="Antífona de Comunhão" id="areaCompartilhar9">
+      <h3 id="antifona-comunhao"><i class="fas fa-music icon"></i> Antífona de Comunhão</h3>
+      <p>Bem-aventurada aquela que acreditou, porque será cumprido, o que o Senhor lhe prometeu. (Cf. Lc 1, 45)</p>
+      <p class="legenda">Gostou deste conteúdo? Compartilhe e seja um instrumento de evangelização na vida de alguém.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(9)">
+        <i class="fas fa-share-alt"></i> Compartilhar
+      </button>
+      <button class="btn-copiar" onclick="copiarTexto(9)">
+        <i class="fas fa-copy icon"></i> Copiar
+      </button>
+    </div>
+    {% endif %}
+    <button id="btnToggleCalendario">Consultar outra data litúrgica</button>
+    <div class="calendario-container" id="calendarioContainer" aria-label="Calendário litúrgico para consulta direta">
+      <h2><i class="fas fa-calendar-alt"></i> Consultar outra data litúrgica</h2>
+      <input type="date" id="data_liturgia" value="{{ data|replace('/', '-') }}" aria-label="Selecione a data litúrgica" />
+      <button onclick="buscarLiturgia()" aria-label="Buscar liturgia da data selecionada">Buscar</button>
+      <button id="btnOcultarCalendario">Ocultar Calendário</button>
+    </div>
+    <div class="msg-confirmacao" id="msgConfirmacao">Conteúdo copiado!</div>
+    <div class="progresso-compartilhamento" id="progressoCompartilhamento">
+      <div>Preparando imagens...</div>
+      <div class="progresso-barra">
+        <div class="progresso-preenchimento" id="progressoPreenchimento"></div>
+      </div>
+      <div id="progressoTexto">0%</div>
+    </div>
+    <div class="modal-multiplas-imagens" id="modalMultiplasImagens">
+      <div class="modal-conteudo">
+        <div class="modal-titulo">📱 Múltiplas Imagens Geradas</div>
+        <div class="modal-texto">
+          Este conteúdo foi dividido em <span id="totalImagens">0</span> imagens.
+          Escolha como deseja compartilhar:
+        </div>
+        <div class="preview-imagens" id="previewImagens"></div>
+        <div class="modal-botoes">
+          <button class="modal-botao primario" onclick="compartilharPrimeiraImagem()">
+            📤 Compartilhar 1ª Imagem
+          </button>
+          <button class="modal-botao secundario" onclick="compartilharTodasImagens()">
+            📱 Enviar todas para WhatsApp
+          </button>
+          <button class="modal-botao secundario" onclick="fecharModal()">
+            ❌ Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="footer">
+      <p>&copy; {{ ano }} - Aplicativo de Liturgia Católica</p>
+    </div>
+    <a href="/" class="back-link" aria-label="Voltar para a página inicial"><i class="fas fa-arrow-left"></i> Voltar</a>
+  </div>
+
+<script>
+  let imagensGeradas = [];
+  let tituloAtual = '';
+  const baseUrl = "https://confission.onrender.com/liturgia";
+  const siteFonte = "\n\nFonte: confission.onrender.com";
+
+  function buscarLiturgia() {
+    const data = document.getElementById('data_liturgia').value;
+    if (data) {
+      window.location.href = `/liturgia?data=${data}`;
+    }
+  }
+
+  document.getElementById('btnToggleCalendario').addEventListener('click', function () {
+    const calendario = document.getElementById('calendarioContainer');
+    calendario.classList.toggle('visivel');
+    if (calendario.classList.contains('visivel')) {
+      this.textContent = 'Ocultar calendário';
+      this.classList.add('ocultar');
+    } else {
+      this.textContent = 'Consultar outra data litúrgica';
+      this.classList.remove('ocultar');
+    }
+  });
+
+  document.getElementById('btnOcultarCalendario').addEventListener('click', function () {
+    const calendario = document.getElementById('calendarioContainer');
+    const btnToggle = document.getElementById('btnToggleCalendario');
+    calendario.classList.remove('visivel');
+    btnToggle.textContent = 'Consultar outra data litúrgica';
+    btnToggle.classList.remove('ocultar');
+  });
+
+  // === Função definitiva para copiar texto com título e conteúdo separados por \n\n ===
+  async function copiarTexto(id) {
+    const elemento = document.getElementById('areaCompartilhar' + id);
+    if (!elemento) return alert('Elemento não encontrado.');
+
+    // Extrai o título do <h3> — sempre limpo e completo
+    const tituloElement = elemento.querySelector('h3');
+    let titulo = '';
+    if (tituloElement) {
+      const tituloClone = tituloElement.cloneNode(true);
+      const icons = tituloClone.querySelectorAll('.icon');
+      icons.forEach(icon => icon.remove());
+      titulo = tituloClone.textContent.trim();
+    }
+
+    // Extrai o conteúdo do <p> — ignorando .legenda e outros botões
+    let conteudo = '';
+    const paragrafos = elemento.querySelectorAll('p:not(.legenda)');
+    paragrafos.forEach(p => {
+      const pClone = p.cloneNode(true);
+      // Remove botões, áudios e downloads dentro do <p>
+      const btns = pClone.querySelectorAll('.btn-copiar, .btn-compartilhar, .audio-player, .botoes-download');
+      btns.forEach(btn => btn.remove());
+      // Remove tags de formatação internas, mantendo só o texto
+      const tags = pClone.querySelectorAll('strong, em, i, b, span');
+      tags.forEach(tag => tag.replaceWith(tag.textContent));
+      // Adiciona o texto limpo
+      conteudo += pClone.textContent.trim() + '\n';
+    });
+
+    // Tratamento especial para Salmo (id=5)
+    if (id === 5) {
+      const refElement = elemento.querySelector('p strong');
+      const refraoElement = elemento.querySelector('p em');
+      if (refElement) {
+        conteudo = refElement.textContent.trim() + '\n' + conteudo;
+      }
+      if (refraoElement) {
+        conteudo = 'Refrão: ' + refraoElement.textContent.trim() + '\n' + conteudo;
+      }
+    }
+
+    // Limpa múltiplas quebras de linha consecutivas
+    conteudo = conteudo.replace(/\n\s*\n/g, '\n').trim();
+
+    // Monta o texto final: Título + \n\n + Conteúdo + \n\n + Fonte
+    let textoFinal = '';
+
+    if (titulo) {
+      textoFinal += titulo + '\n\n'; // ← SEMPRE duas quebras entre título e conteúdo!
+    }
+
+    if (conteudo) {
+      textoFinal += conteudo + '\n\n'; // ← Uma quebra após o conteúdo
+    }
+
+    textoFinal += 'Fonte: confission.onrender.com';
+
+    try {
+      await navigator.clipboard.writeText(textoFinal);
+      mostrarMensagem('Conteúdo copiado!');
+    } catch (err) {
+      console.error('Erro ao copiar:', err);
+      // Fallback para navegadores antigos
+      const textarea = document.createElement('textarea');
+      textarea.value = textoFinal;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      mostrarMensagem('Conteúdo copiado! (fallback)');
+    }
+  }
+
+  // === Calcular largura do texto para quebrar em 8 linhas ===
+  function calcularLarguraTexto(texto, fontSize) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    context.font = `${fontSize}rem Georgia, serif`;
+    return context.measureText(texto).width;
+  }
+
+  // === Dividir texto em blocos de até 8 linhas ===
+  function dividirTextoEmLinhas(texto) {
+    const linhasPorPagina = 8;
+    const larguraMaxima = 1020;
+    const fontSize = 2.6;
+    const palavras = texto.split(' ');
+    let linhas = [];
+    let linhaAtual = '';
+    for (const palavra of palavras) {
+      const teste = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+      const largura = calcularLarguraTexto(teste, fontSize);
+      if (largura > larguraMaxima && linhaAtual) {
+        linhas.push(linhaAtual);
+        linhaAtual = palavra;
+      } else {
+        linhaAtual = teste;
+      }
+    }
+    if (linhaAtual) linhas.push(linhaAtual);
+    let paginas = [];
+    for (let i = 0; i < linhas.length; i += linhasPorPagina) {
+      const paginaLinhas = linhas.slice(i, i + linhasPorPagina);
+      paginas.push({
+        texto: paginaLinhas.join(' '),
+        fontSize: fontSize
+      });
+    }
+    return paginas;
+  }
+
+  function mostrarProgresso(atual, total) {
+    const progresso = document.getElementById('progressoCompartilhamento');
+    const preenchimento = document.getElementById('progressoPreenchimento');
+    const texto = document.getElementById('progressoTexto');
+    progresso.style.display = 'block';
+    const porcentagem = Math.round((atual / total) * 100);
+    preenchimento.style.width = porcentagem + '%';
+    texto.textContent = `${porcentagem}% (${atual}/${total})`;
+  }
+
+  function ocultarProgresso() {
+    document.getElementById('progressoCompartilhamento').style.display = 'none';
+  }
+
+  function mostrarMensagem(texto) {
+    const msg = document.getElementById('msgConfirmacao');
+    msg.textContent = texto;
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  }
+
+  async function gerarImagemPagina(titulo, textoConteudo, fontSize, numeroPagina, totalPaginas) {
+    return new Promise((resolve, reject) => {
+      const tempDiv = document.createElement('div');
+      tempDiv.className = 'captura-conteudo';
+      if (totalPaginas > 1) {
+        const indicador = document.createElement('div');
+        indicador.className = 'indicador-pagina';
+        indicador.textContent = `${numeroPagina}/${totalPaginas}`;
+        tempDiv.appendChild(indicador);
+      }
+      const topoDiv = document.createElement('div');
+      topoDiv.className = 'captura-topo';
+      const img = document.createElement('img');
+      img.src = "{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}";
+      img.alt = "Cristo Pantocrator";
+      img.className = 'captura-imagem-pequena';
+      topoDiv.appendChild(img);
+      const tituloElement = document.createElement('h3');
+      tituloElement.className = 'captura-titulo';
+      tituloElement.textContent = titulo;
+      topoDiv.appendChild(tituloElement);
+      tempDiv.appendChild(topoDiv);
+      const textoDiv = document.createElement('div');
+      textoDiv.className = 'captura-texto';
+      textoDiv.style.fontSize = `${fontSize}rem`;
+      const p = document.createElement('p');
+      p.innerHTML = textoConteudo.replace(/\n/g, '<br>');
+      textoDiv.appendChild(p);
+      tempDiv.appendChild(textoDiv);
+      const footerDiv = document.createElement('div');
+      footerDiv.className = 'captura-footer';
+      footerDiv.innerHTML = `Fonte: <a href="${baseUrl}" class="captura-link" target="_blank">confission.onrender.com</a><br>Compartilhado via Liturgia Diária`;
+      tempDiv.appendChild(footerDiv);
+      document.body.appendChild(tempDiv);
+      html2canvas(tempDiv, {
+        backgroundColor: '#fffef8',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 1080,
+        height: 1080
+      }).then(canvas => {
+        document.body.removeChild(tempDiv);
+        resolve(canvas);
+      }).catch(err => {
+        if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+        reject(err);
+      });
+    });
+  }
+
+  function abrirModal(imagens, titulo) {
+    const modal = document.getElementById('modalMultiplasImagens');
+    const totalImagens = document.getElementById('totalImagens');
+    const previewContainer = document.getElementById('previewImagens');
+    totalImagens.textContent = imagens.length;
+    previewContainer.innerHTML = '';
+    imagens.forEach((canvas, index) => {
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/png');
+      img.className = 'preview-imagem';
+      img.title = `Imagem ${index + 1}`;
+      previewContainer.appendChild(img);
+    });
+    modal.style.display = 'flex';
+  }
+
+  function fecharModal() {
+    document.getElementById('modalMultiplasImagens').style.display = 'none';
+  }
+
+  function compartilharImagemIndividual(canvas, nomeArquivo) {
+    canvas.toBlob(blob => {
+      const file = new File([blob], `${nomeArquivo}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          title: 'Liturgia do Dia',
+          text: '℣. Que a Palavra de Deus seja a luz do seu caminho! ✝️\nLeia a leitura completa no site:\nhttps://confission.onrender.com/liturgia#' + getHash(),
+          files: [file]
+        }).then(() => mostrarMensagem('Imagem compartilhada!'))
+         .catch(() => mostrarMensagem('Compartilhamento cancelado.'));
+      } else {
+        mostrarMensagem('Seu navegador não suporta compartilhamento.');
+      }
+    });
+  }
+
+  function compartilharPrimeiraImagem() {
+    if (imagensGeradas.length > 0) {
+      compartilharImagemIndividual(imagensGeradas[0], `${tituloAtual}_parte_1`);
+    }
+  }
+
+  function getHash() {
+    if (tituloAtual.includes('antifona_entrada')) return 'antifona-entrada';
+    if (tituloAtual.includes('oracao')) return 'oracao-dia';
+    if (tituloAtual.includes('primeira')) return 'primeira-leitura';
+    if (tituloAtual.includes('salmo')) return 'salmo-responsorial';
+    if (tituloAtual.includes('segunda')) return 'segunda-leitura';
+    if (tituloAtual.includes('evangelho')) return 'evangelho';
+    if (tituloAtual.includes('ofertorio')) return 'ofertorio';
+    if (tituloAtual.includes('comunhao')) return 'comunhao';
+    if (tituloAtual.includes('antifona_comunhao')) return 'antifona-comunhao';
+    return '';
+  }
+
+  function compartilharTodasImagens() {
+    fecharModal();
+    if (imagensGeradas.length === 0) return;
+    mostrarProgresso(0, imagensGeradas.length);
+    const promises = imagensGeradas.map((canvas, index) =>
+      new Promise(resolve => {
+        canvas.toBlob(blob => {
+          const file = new File([blob], `${tituloAtual}_parte_${index + 1}.png`, { type: 'image/png' });
+          resolve(file);
+        });
+      })
+    );
+    Promise.all(promises).then(files => {
+      ocultarProgresso();
+      if (navigator.canShare && navigator.canShare({ files })) {
+        navigator.share({
+          files: files
+        }).then(() => {
+          mostrarMensagem('Imagens compartilhadas!');
+        }).catch(err => {
+          console.error('Erro ao compartilhar:', err);
+          mostrarMensagem('Compartilhamento cancelado.');
+        });
+      } else {
+        mostrarMensagem('Seu navegador não suporta compartilhamento.');
+      }
+    });
+  }
+
+  async function compartilhar(id) {
+    const elemento = document.getElementById('areaCompartilhar' + id);
+    if (!elemento) return alert('Elemento não encontrado.');
+    const clone = elemento.cloneNode(true);
+    const btnCompartilhar = clone.querySelector('.btn-compartilhar');
+    if (btnCompartilhar) btnCompartilhar.remove();
+    const legenda = clone.querySelector('.legenda');
+    if (legenda) legenda.remove();
+    const titulo = clone.querySelector('h3');
+    const tituloTexto = titulo ? titulo.textContent.trim() : 'Liturgia';
+    tituloAtual = tituloTexto.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '_');
+    let conteudoCompleto = '';
+    if (id === 5) {
+      const ps = clone.querySelectorAll('p');
+      ps.forEach(p => {
+        if (!p.classList.contains('legenda')) {
+          conteudoCompleto += p.textContent + ' ';
+        }
+      });
+    } else {
+      const p = clone.querySelector('p:not(.legenda)');
+      conteudoCompleto = p ? p.textContent : '';
+    }
+    if (!conteudoCompleto.trim()) return alert('Conteúdo vazio.');
+    try {
+      const paginas = dividirTextoEmLinhas(conteudoCompleto);
+      imagensGeradas = [];
+      mostrarProgresso(0, paginas.length);
+      for (let i = 0; i < paginas.length; i++) {
+        mostrarProgresso(i + 1, paginas.length);
+        const canvas = await gerarImagemPagina(
+          tituloTexto,
+          paginas[i].texto,
+          paginas[i].fontSize,
+          i + 1,
+          paginas.length
+        );
+        imagensGeradas.push(canvas);
+        await new Promise(r => setTimeout(r, 50));
+      }
+      ocultarProgresso();
+      if (imagensGeradas.length > 1) {
+        abrirModal(imagensGeradas, tituloAtual);
+      } else {
+        compartilharImagemIndividual(imagensGeradas[0], tituloAtual);
+      }
+    } catch (err) {
+      console.error('Erro:', err);
+      mostrarMensagem('Erro ao gerar imagem.');
+      ocultarProgresso();
+    }
+  }
+</script>
+</body>
+</html>

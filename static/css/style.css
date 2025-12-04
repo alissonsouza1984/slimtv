@@ -1,0 +1,238 @@
+/* Estilo base da página */
+body.page-body {
+  font-family: Georgia, serif;
+  padding: 40px;
+  color: #333;
+  background-color: #fffef8;
+}
+
+/* Título principal */
+h1.title {
+  text-align: center;
+  color: #6a4f28;
+  margin-bottom: 30px;
+}
+
+/* Títulos de seções como "1. Amar a Deus sobre todas as coisas" */
+.section-title {
+  color: #4a3820;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+/* Card de mandamentos - com linha dourada à esquerda */
+.card-section {
+  border-left: 5px solid #d4af37; /* Linha dourada à esquerda */
+  background-color: #fffef8;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Estilização do texto dentro dos cards */
+.card-section h3 {
+  color: #4a3820;
+  font-weight: bold;
+}
+
+/* Lista de pecados */
+.list-group-item {
+  border: none;
+  color: #333;
+  padding-left: 0;
+}
+
+.list-group-flush .list-group-item {
+  border-width: 0;
+}
+
+/* Ícone centralizado */
+.icon {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.icon img {
+  width: 120px;
+  border-radius: 10px;
+  border: 3px solid #d4af37;
+}
+
+/* Botões */
+button.btn {
+  padding: 10px 20px;
+  background-color: #d4af37;
+  border: none;
+  border-radius: 6px;
+  color: #4a3820;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button.btn:hover {
+  background-color: #b38c1a;
+  color: white;
+}
+
+/* Área de digitação de pecados personalizados */
+textarea.form-control {
+  border: 2px solid #d4af37;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: Georgia, serif;
+  color: #4a3820;
+  resize: vertical;
+}
+
+/* Player de áudio */
+.audio-player {
+  margin: 1rem auto;
+  max-width: 600px;
+  text-align: center;
+}
+
+.audio-player audio {
+  width: 100%;
+  border: 2px solid #d4af37;
+  border-radius: 8px;
+  padding: 8px;
+  background-color: #fffef8;
+}
+
+/* Citação bíblica */
+blockquote {
+  font-style: italic;
+  color: #4a3820;
+  margin-top: 1rem;
+}
+
+/* Estilização do menu flutuante */
+.dropdown-menu {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 9998;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 250px;
+}
+
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820; /* Cor do texto */
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #b38c1a;
+  color: white;
+}
+
+/* Link de volta para a página inicial */
+.back-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #4a3820;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+/* Garantia de display flex para o dropdown */
+.dropdown-menu {
+  display: none;
+  flex-direction: column;
+}
+
+/* Forçar display:flex quando ativo */
+.dropdown-menu.show {
+  display: flex;
+}
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820; /* Cor personalizada */
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  display: block;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: #b38c1a;
+  color: white;
+}
+.floating-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #d4af37;
+  color: #4a3820;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  font-size: 2rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  z-index: 9999;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.floating-btn:hover {
+  transform: scale(1.1);
+}
+
+.dropdown-menu {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 9998;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 250px;
+}
+
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820;
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.dropdown-item:hover {
+  background-color: #b38c1a;
+  color: white;
+}

@@ -1,0 +1,7 @@
+Flask==2.3.3
+WeasyPrint==53.0
+gunicorn
+requests
+beautifulsoup4==4.12.3
+lxml==5.2.1
+natsort==8.4.0

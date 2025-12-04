@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meditações Teológicas dos Mistérios do Rosário</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      background: #f9f9f9;
+      color: #333;
+      margin: 20px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h2, h3 {
+      color: #2c3e50;
+    }
+    .card-terco {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .versiculo {
+      font-style: italic;
+      margin: 10px 0;
+      color: #555;
+    }
+    .explicacao, .meditacao {
+      margin: 10px 0 20px 0;
+      padding-left: 15px;
+      border-left: 3px solid #2980b9;
+      background: #eaf3fb;
+      color: #1b2a47;
+    }
+    .terco-imagem img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .introducao-rosario {
+      background: #d6eaf8;
+      border-left: 6px solid #2980b9;
+      padding: 25px 20px;
+      margin-bottom: 40px;
+    }
+    a.back-link {
+      display: inline-block;
+      margin-top: 40px;
+      color: #2980b9;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a.back-link:hover {
+      text-decoration: underline;
+    }
+    audio {
+      width: 100%;
+      margin: 15px 0;
+    }
+    .oracoes-misterio {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f1f9f1;
+      border-left: 4px solid #27ae60;
+      font-size: 0.95rem;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="titulo-terco">🕊️ SANTO ROSÁRIO – GUIA COMPLETO</h1>
+
+  <!-- INTRODUÇÃO AO ROSÁRIO -->
+  <div class="card-terco introducao-rosario">
+    <h2>🙏 Introdução ao Santo Rosário</h2>
+    <p>O Rosário é uma das devoções mais queridas e difundidas na espiritualidade católica. Ele é uma oração contemplativa que convida o fiel a meditar profundamente os mistérios da vida de Jesus Cristo e de sua Santíssima Mãe, Maria...</p>
+    <!-- Conteúdo da introdução omitido para brevidade -->
+  </div>
+
+  <!-- MISTÉRIOS GOZOSOS -->
+  <div class="card-terco">
+    <h3>📜 Mistérios Gozosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/goz.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. A Anunciação do Anjo a Maria</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/anunciacao.png') }}" alt="Anunciação do Anjo a Maria" />
+        </div>
+        <div class="versiculo">Lc 1, 26-38 – “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.”</div>
+        <div class="explicacao">
+          <p>Na Anunciação, contemplamos o momento sublime em que o Verbo eterno se faz carne por obra do Espírito Santo...</p>
+        </div>
+        <div class="meditacao">
+          Ó Maria, humilde serva do Altíssimo, ajuda-nos a imitar tua docilidade e confiança em Deus...
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios gozosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS DOLOROSOS -->
+  <div class="card-terco">
+    <h3>🔥 Mistérios Dolorosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/dor.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Jesus Agonia no Horto</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/horto.png') }}" alt="Jesus Agonia no Horto" />
+        </div>
+        <div class="versiculo">Mt 26, 36-46 – “Meu Pai, se é possível, afaste de mim este cálice.”</div>
+        <div class="explicacao">
+          <p>Aqui vemos a humanidade dolorosa de Jesus diante do sofrimento iminente...</p>
+        </div>
+        <div class="meditacao">
+          Jesus, Mestre da oração, ensina-nos a buscar força na intimidade com Deus...
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios dolorosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS GLORIOSOS -->
+  <div class="card-terco">
+    <h3>🕊️ Mistérios Gloriosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/glo.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Ressurreição de Jesus</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/ressurreicao.png') }}" alt="Ressurreição de Jesus" />
+        </div>
+        <div class="versiculo">Lc 24, 1-12 – “Ele não está aqui; ressuscitou!”</div>
+        <div class="explicacao">
+          <p>A Ressurreição é o centro da nossa fé: a vitória de Cristo sobre a morte e o pecado...</p>
+        </div>
+        <div class="meditacao">
+          Jesus ressuscitado, enche-nos de esperança e alegria para vivermos na luz da tua vitória.
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios gloriosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS LUMINOSOS -->
+  <div class="card-terco">
+    <h3>💡 Mistérios Luminosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/lum.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Batismo de Jesus no Jordão</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/batismo.png') }}" alt="Batismo de Jesus no Jordão" />
+        </div>
+        <div class="versiculo">Mt 3, 13-17 – “Este é o meu Filho amado, em quem me comprazo.”</div>
+        <div class="explicacao">
+          <p>No Batismo, Jesus inaugura sua missão messiânica e nos mostra o caminho da obediência e da fidelidade ao Pai...</p>
+        </div>
+        <div class="meditacao">
+          Pai amado, ajuda-nos a renovar nosso batismo, vivendo em fidelidade e entrega ao teu Filho Jesus.
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios luminosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- SALVE RAINHA -->
+  <div class="card-terco">
+    <h3>🕊️ Salve Rainha</h3>
+    <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+    <p>Em nossas dores e angústias, nós aclamamos e suplicamos...</p>
+    <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+  </div>
+
+  <a href="/" class="back-link">← Voltar ao Exame de Consciência</a>
+</body>
+</html>

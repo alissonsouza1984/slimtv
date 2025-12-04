@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <link rel="manifest" href="/site.webmanifest" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ titulo }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" type="image/x-icon">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    /* ---------------------------------------------------------------------- */
+    /* ESTILOS GERAIS */
+    /* ---------------------------------------------------------------------- */
+    body.page-body { background: #faf7f1; font-family: "Georgia", serif; color: #4a3820; min-height: 100vh; margin: 0; padding: 0 1rem; }
+    .container.my-5 { max-width: 900px; margin: 2rem auto 3rem auto; background: #fffef8; border-radius: 16px; box-shadow: 0 0 30px rgba(212, 175, 55, 0.3); padding: 2rem 3rem; border-left: 6px solid #d4af37; }
+    @media (max-width: 768px) { .container.my-5 { margin: 1rem auto 2rem auto; padding: 1rem; border-left-width: 4px; } }
+    .titulo-dia { font-size: 2.5rem; font-weight: 900; color: #6a4f28; text-align: center; margin-bottom: 0.5rem; font-family: "Times New Roman", serif; text-shadow: 1px 1px 2px #bfa036; }
+    .subtitulo { font-style: italic; text-align: center; margin-bottom: 2rem; color: #7f6b3b; font-size: 1.1rem; letter-spacing: 1px; }
+    @media (max-width: 768px) { .titulo-dia { font-size: 1.8rem; } .subtitulo { font-size: 0.9rem; } }
+    .card-liturgia { margin-bottom: 2rem; border-left: 5px solid #d4af37; background-color: #fffef8; padding: 1.5rem; border-radius: 12px; font-size: 1.2rem; line-height: 1.6; box-shadow: 0 0 12px rgba(212, 175, 55, 0.15); transition: box-shadow 0.3s ease; position: relative; }
+    .card-liturgia:hover { box-shadow: 0 0 18px rgba(212, 175, 55, 0.35); }
+    .card-liturgia h3 { color: #4a3820; font-weight: 900; font-size: 1.6rem; margin-bottom: 0.8rem; font-family: "Georgia", serif; text-shadow: 0 0 4px #bfa036; }
+    @media (max-width: 768px) { .card-liturgia { padding: 1rem; font-size: 1rem; } .card-liturgia h3 { font-size: 1.2rem; } }
+    .btn-copiar, .btn-compartilhar { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; background-color: #c4a15a; color: white; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; margin-top: 0.5rem; transition: background 0.3s ease; font-family: "Georgia", serif; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .btn-copiar:hover, .btn-compartilhar:hover { background-color: #a27d3a; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+    .back-link { display: inline-block; margin-top: 1.5rem; color: #4a3820; text-decoration: none; font-weight: 700; font-size: 1.1rem; font-family: "Georgia", serif; border-bottom: 2px solid transparent; transition: border-color 0.3s ease; }
+    .back-link:hover { border-color: #d4af37; text-decoration: none; }
+    .audio-player audio { width: 100%; border-radius: 12px; outline: none; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5); cursor: pointer; transition: box-shadow 0.3s ease; }
+    .lista-audios { margin: 1rem 0; }
+    .item-audio { margin-bottom: 1.5rem; padding: 0.8rem 1rem; border: 1px solid #e0d8c8; border-radius: 12px; background-color: #fffef8; box-shadow: inset 0 0 5px rgba(212,175,55,0.1); }
+    .botoes-download { margin-top: 0.5rem; font-size: 0.9rem; }
+    .botoes-download a { margin-right: 1rem; color: #8B4513; text-decoration: none; font-weight: 600; }
+    .alerta-api { max-width: 720px; margin: 1rem auto 2rem auto; padding: 1rem 1.5rem; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 12px; color: #856404; font-weight: 600; text-align: center; font-family: "Georgia", serif; box-shadow: 0 0 10px rgba(212,175,55,0.4); }
+    /* Estilos do Calendário */
+    .calendario-container { background: rgba(255, 215, 0, 0.12); border: 2px solid #d4af37; border-radius: 16px; padding: 20px 25px; max-width: 480px; margin: 40px auto 20px auto; text-align: center; box-shadow: 0 0 20px rgba(212, 175, 55, 0.35); font-family: "Georgia", serif; display: none; }
+    .calendario-container.visivel { display: block; animation: fadeIn 0.5s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    .calendario-container h2 { color: goldenrod; font-weight: 900; margin-bottom: 20px; font-size: 1.7rem; text-shadow: 0 0 5px #bfa036; }
+    .calendario-container input[type="date"] { padding: 12px 15px; border: 2px solid #d4af37; border-radius: 12px; background-color: rgba(255, 255, 255, 0.95); font-size: 1.1rem; color: #4a3820; width: 65%; box-sizing: border-box; transition: border-color 0.3s ease; font-family: "Georgia", serif; }
+    .calendario-container button { margin-left: 12px; padding: 12px 25px; background-color: goldenrod; border: none; border-radius: 12px; cursor: pointer; color: white; font-weight: 900; font-size: 1.1rem; font-family: "Georgia", serif; transition: background-color 0.3s ease; box-shadow: 0 0 10px #bfa036; }
+    #btnToggleCalendario { background: linear-gradient(135deg, #2c3e50 0%, #1a2530 100%); color: #f0c987; font-weight: 900; padding: 14px 32px; border: 2px solid #d4af37; border-radius: 12px; cursor: pointer; font-family: "Courier New", monospace; font-size: 1.3rem; box-shadow: 0 6px 15px rgba(44, 62, 80, 0.5); transition: all 0.3s ease; display: block; margin: 3rem auto 2rem auto; max-width: 350px; position: relative; overflow: hidden; letter-spacing: 1px; }
+    #btnOcultarCalendario { background: linear-gradient(135deg, #8B4513 0%, #6b3a0f 100%); color: #fffef8; font-weight: 700; padding: 8px 20px; border: 1px solid #d4af37; border-radius: 8px; cursor: pointer; font-family: "Courier New", monospace; font-size: 0.9rem; margin-top: 15px; transition: all 0.3s ease; letter-spacing: 1px; }
+    .imagem-cristo { text-align: center; margin: 2rem 0; }
+    .imagem-cristo img { max-width: 200px; width: 100%; border-radius: 16px; box-shadow: 0 0 25px rgba(212, 175, 55, 0.6); border: 3px solid gold; }
+    .titulo-liturgia { text-align: center; font-size: 2rem; font-weight: bold; color: #6a4f28; margin: 1.5rem 0; font-family: "Georgia", serif; display: none; }
+    .legenda { text-align: center; margin-top: 0.5rem; font-size: 0.9rem; color: #5b3e19; }
+    .footer { margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #888; }
+    .msg-confirmacao { position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-weight: bold; z-index: 10000; display: none; animation: slideIn 0.3s, fadeOut 0.5s 2.5s; font-size: 0.9rem; max-width: 300px; }
+    
+    /* ---------------------------------------------------------------------- */
+    /* ESTILOS ESPECÍFICOS DO SALMO */
+    /* ---------------------------------------------------------------------- */
+    #texto-salmo p, #texto-salmo { color: #4a3820; }
+    
+    .corpo-salmo {
+        margin-top: 1.5rem;
+        font-size: 1.15rem; 
+        white-space: pre-wrap; 
+    }
+
+    .refrao-salmo {
+        margin: 1rem 0 0.5rem 0;
+        font-style: italic;
+        color: #8B4513; 
+        font-size: 1.25rem;
+        padding: 0.5rem 0;
+        border-top: 1px dashed #d4af3755;
+        border-bottom: 1px dashed #d4af3755;
+        text-align: center;
+    }
+
+    /* Animações para a mensagem de confirmação */
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+  </style>
+</head>
+<body class="page-body">
+  <div class="container my-5">
+    {% if api_falhou %}
+    <div class="alerta-api" role="alert" aria-live="assertive">
+      ⚠️ Não foi possível carregar os dados litúrgicos. Verifique sua conexão.
+    </div>
+    {% endif %}
+    
+    <div class="imagem-cristo">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    <div class="titulo-liturgia">Liturgia Diária</div>
+    <div class="titulo-dia">{{ titulo }}</div>
+    <div class="subtitulo">Cor Litúrgica: {{ cor }} — {{ data }}</div>
+    
+    {% if antifona_entrada %}
+    <div class="card-liturgia" id="areaCompartilhar1">
+      <h3 id="antifona-entrada"><i class="fas fa-cross icon"></i> Antífona de Entrada</h3>
+      <p>{{ antifona_entrada }}</p>
+      <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(1)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      <button class="btn-copiar" onclick="copiarTexto(1)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+    {% endif %}
+
+    {% if oracao_dia %}
+    <div class="card-liturgia" id="areaCompartilhar2">
+      <h3 id="oracao-dia"><i class="fas fa-pray icon"></i> Oração do Dia</h3>
+      <p>{{ oracao_dia }}</p>
+      <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(2)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      <button class="btn-copiar" onclick="copiarTexto(2)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+    {% endif %}
+
+    <div class="card-liturgia" id="areaCompartilhar3">
+      <h3 id="primeira-leitura"><i class="fas fa-book icon"></i> Primeira Leitura</h3>
+      <p>{{ primeira_leitura | safe }}</p>
+      <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(3)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      <button class="btn-copiar" onclick="copiarTexto(3)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+
+    <div class="card-liturgia" id="areaCompartilhar5">
+        <h3 id="salmo-responsorial-titulo"><i class="fas fa-music icon"></i> Salmo Responsorial</h3>
+        
+        {% set salmo_data = salmo_responsorial or salmo %}
+        
+        {% if salmo_data is mapping %}
+            <div id="texto-salmo">
+                <p><strong>{{ salmo_data.referencia }}</strong></p>
+                
+                <p class="refrao-salmo">
+                    <i class="fas fa-quote-left"></i>
+                    <strong>{{ salmo_data.refrao }}</strong>
+                    <i class="fas fa-quote-right"></i>
+                </p>
+                
+                <div class="corpo-salmo">{{ salmo_data.texto | replace('\n', '<br>') | safe }}</div>
+            </div>
+        {% else %}
+            <div id="texto-salmo">
+                {% if salmo_data %}{{ salmo_data | safe }}{% else %}<p><em>Salmo não disponível ou em formato desconhecido.</em></p>{% endif %}
+            </div>
+        {% endif %}
+
+        <div class="lista-audios">
+            <p><small>🔊 Áudios disponíveis:</small></p>
+            {% if salmos_do_dia %}
+                {% for salmo_audio in salmos_do_dia %}
+                <div class="item-audio">
+                  <strong>{{ formatar_nome_salmo(salmo_audio.filename) }}</strong>
+                  <div class="audio-player">
+                    <audio controls preload="none">
+                      <source src="{{ url_for('play_salmo', filename=salmo_audio.filename) }}" type="audio/mpeg" />
+                    </audio>
+                  </div>
+                  <div class="botoes-download">
+                    <a href="{{ url_for('download_mp3', filename=salmo_audio.filename) }}">⬇️ MP3</a>
+                    <a href="{{ url_for('download_doc', filename=salmo_audio.filename) }}">📄 Cifra</a>
+                  </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p><small>Nenhum áudio encontrado para hoje.</small></p>
+            {% endif %}
+        </div>
+        
+        <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+        <button class="btn-compartilhar" onclick="compartilhar(5)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+        <button class="btn-copiar" onclick="copiarTexto(5)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+
+    {% if segunda_leitura %}
+    <div class="card-liturgia" id="areaCompartilhar4">
+      <h3 id="segunda-leitura"><i class="fas fa-book-open icon"></i> Segunda Leitura</h3>
+      <p>{{ segunda_leitura | safe }}</p>
+      <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(4)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      <button class="btn-copiar" onclick="copiarTexto(4)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+    {% endif %}
+
+    <div class="card-liturgia" id="areaCompartilhar6">
+      <h3 id="evangelho"><i class="fas fa-cross icon"></i> Evangelho</h3>
+      <p>{{ evangelho | safe }}</p>
+      <p class="legenda">Gostou? Compartilhe e evangelize.</p>
+      <button class="btn-compartilhar" onclick="compartilhar(6)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      <button class="btn-copiar" onclick="copiarTexto(6)"><i class="fas fa-copy"></i> Copiar</button>
+    </div>
+
+    {% if ofertorio %}
+    <div class="card-liturgia" id="areaCompartilhar7">
+      <h3 id="ofertorio"><i class="fas fa-dove icon"></i> Ofertório</h3>
+      <p>{{ ofertorio }}</p>
+      <button class="btn-compartilhar" onclick="compartilhar(7)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+    </div>
+    {% endif %}
+
+    {% if comunhao %}
+    <div class="card-liturgia" id="areaCompartilhar8">
+      <h3 id="comunhao"><i class="fas fa-heart icon"></i> Comunhão</h3>
+      <p>{{ comunhao }}</p>
+      <button class="btn-compartilhar" onclick="compartilhar(8)"><i class="fas fa-share-alt"></i> Compartilhar</button>
+    </div>
+    {% endif %}
+
+    <button id="btnToggleCalendario">Consultar outra data litúrgica</button>
+    
+    <div class="calendario-container" id="calendarioContainer">
+      <h2><i class="fas fa-calendar-alt"></i> Consultar data</h2>
+      <input type="date" id="data_liturgia" value="{{ data|replace('/', '-') }}" />
+      <button onclick="buscarLiturgia()">Buscar</button>
+      <button id="btnOcultarCalendario">Ocultar</button>
+    </div>
+
+    <div class="msg-confirmacao" id="msgConfirmacao">Copiado!</div>
+    
+    <div class="progresso-compartilhamento" id="progressoCompartilhamento">
+       <div class="progresso-barra"><div class="progresso-preenchimento" id="progressoPreenchimento"></div></div>
+    </div>
+    <div class="modal-multiplas-imagens" id="modalMultiplasImagens">
+      <div class="modal-conteudo">
+        <div class="preview-imagens" id="previewImagens"></div>
+        <div class="modal-botoes">
+            <button class="modal-botao primario" onclick="compartilharPrimeiraImagem()">Compartilhar 1ª</button>
+            <button class="modal-botao secundario" onclick="fecharModal()">Fechar</button>
+        </div>
+      </div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <div class="footer">
+      <p>&copy; {{ ano }} - Aplicativo de Liturgia Católica</p>
+    </div>
+    <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> Voltar</a>
+  </div>
+
+<script>
+  // Scripts básicos de funcionalidade
+  function buscarLiturgia() {
+    const data = document.getElementById('data_liturgia').value;
+    if (data) window.location.href = `/liturgia?data=${data}`;
+  }
+
+  document.getElementById('btnToggleCalendario').addEventListener('click', function () {
+    const cal = document.getElementById('calendarioContainer');
+    cal.classList.toggle('visivel');
+    this.textContent = cal.classList.contains('visivel') ? 'Ocultar calendário' : 'Consultar outra data litúrgica';
+  });
+
+  document.getElementById('btnOcultarCalendario').addEventListener('click', function() {
+      document.getElementById('calendarioContainer').classList.remove('visivel');
+      document.getElementById('btnToggleCalendario').textContent = 'Consultar outra data litúrgica';
+  });
+  
+  function fecharModal() { 
+      document.getElementById('modalMultiplasImagens').style.display = 'none'; 
+  }
+
+  // ---------------------------------------------
+  // FUNÇÕES DE COPIAR E COMPARTILHAR (CORRIGIDAS)
+  // ---------------------------------------------
+  
+  function mostrarConfirmacao(msg = 'Copiado!') {
+    const msgEl = document.getElementById('msgConfirmacao');
+    msgEl.textContent = msg;
+    msgEl.style.display = 'block';
+    setTimeout(() => {
+        msgEl.style.display = 'none';
+        msgEl.style.opacity = 1; 
+    }, 3000);
+  }
+
+  /**
+   * Extrai o conteúdo principal de texto de uma área específica.
+   * @param {number} id - O número identificador da área (1 a 8).
+   * @returns {string} O texto formatado para compartilhamento.
+   */
+  function getTextToShare(id) {
+    const area = document.getElementById('areaCompartilhar' + id);
+    
+    // TRATAMENTO ESPECIAL PARA O SALMO (ID 5)
+    if (id === 5) {
+        const salmoData = {};
+        const refElement = area.querySelector('#texto-salmo strong');
+        const refraoElement = area.querySelector('.refrao-salmo strong');
+        const corpoElement = area.querySelector('.corpo-salmo');
+
+        if (refElement) salmoData.referencia = refElement.textContent.trim();
+        if (refraoElement) salmoData.refrao = refraoElement.textContent.trim();
+        if (corpoElement) salmoData.texto = corpoElement.textContent.trim();
+
+        let salmoText = `${salmoData.referencia}\n`;
+        if (salmoData.refrao) salmoText += `Refrão: ${salmoData.refrao}\n\n`;
+        if (salmoData.texto) salmoText += salmoData.texto.replace(/<br\s*\/?>/g, '\n'); 
+        
+        let finalContent = salmoText.replace(/\n\s*\n/g, '\n\n').trim();
+        return finalContent;
+    }
+    
+    // TRATAMENTO PARA OUTRAS LEITURAS
+    let contentElements = area.querySelectorAll('p:not(.legenda), div#texto-salmo, h3');
+    let rawContent = Array.from(contentElements)
+        .map(el => {
+            if (el.tagName === 'H3' || el.classList.contains('legenda') || el.classList.contains('lista-audios')) return '';
+            return el.innerHTML.replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').trim();
+        })
+        .filter(text => text.length > 0 && !text.includes('Compartilhe') && !text.includes('Áudios disponíveis'))
+        .join('\n\n');
+
+    return rawContent.trim();
+  }
+
+  /**
+   * Função auxiliar para formatar o texto completo com cabeçalhos para compartilhar/copiar.
+   * @param {number} id - O número identificador da área.
+   * @returns {string} O texto completo formatado.
+   */
+  function getFullShareText(id) {
+    const tituloDia = document.querySelector('.titulo-dia').textContent.trim();
+    const subtitulo = document.querySelector('.subtitulo').textContent.trim();
+    // Remove ícones do título
+    const tituloLeitura = document.getElementById('areaCompartilhar' + id).querySelector('h3').textContent.trim().replace(/[\u2600-\u26FF]|\u2700-\u27BF|icon/g, '').trim(); 
+    const leituraContent = getTextToShare(id);
+
+    return `*${tituloDia}* - ${subtitulo}\n\n📜 *${tituloLeitura}*\n\n${leituraContent}\n\n_Compartilhado via [Seu App de Liturgia]_`;
+  }
+
+  /**
+   * Função CORRIGIDA para copiar o texto de uma leitura.
+   * @param {number} id - O número identificador da área.
+   */
+  function copiarTexto(id) {
+    const textToCopy = getFullShareText(id); 
+    
+    // A API do Clipboard (área de transferência) é assíncrona
+    navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+            mostrarConfirmacao('Texto copiado!');
+        })
+        .catch(err => {
+            console.error('Erro ao copiar', err);
+            mostrarConfirmacao('Erro ao copiar. Tente selecionar o texto manualmente.');
+        });
+  }
+
+  /**
+   * Função CORRIGIDA para compartilhar o texto.
+   * @param {number} id - O número identificador da área.
+   */
+  function compartilhar(id) {
+    const shareText = getFullShareText(id);
+
+    if (navigator.share) {
+      // 1. Tenta usar a Web Share API (para apps nativos)
+      navigator.share({
+        title: 'Liturgia Diária',
+        text: shareText,
+      }).catch((error) => {
+        if (error.name !== 'AbortError') {
+             // Se o compartilhamento falhar por outro motivo que não seja o usuário cancelar
+             console.log('Compartilhamento nativo falhou. Tentando cópia.', error);
+             copiarTexto(id); // Chama a função de cópia como fallback
+        }
+      });
+    } else {
+      // 2. Fallback completo para navegadores sem Web Share API
+      copiarTexto(id);
+    }
+  }
+
+</script>
+</body>
+</html>

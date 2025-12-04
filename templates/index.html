@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exame de Consciência</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  
+  <!-- Favicon e PWA -->
+  <link rel="icon" type="image/png" href="/static/img/icon-192x192.png" sizes="192x192" />
+  <link rel="icon" type="image/svg+xml" href="/static/img/icon.svg" />
+  <link rel="shortcut icon" href="/static/img/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Exame de Consciência" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <style>
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+      textarea.form-control {
+        width: 100% !important;
+        font-size: 1rem;
+      }
+      .btn {
+        width: 100%;
+        font-size: 1rem;
+      }
+    }
+
+    .audio-player {
+      display: none;
+      margin: 1rem auto;
+      max-width: 600px;
+      text-align: center;
+    }
+
+    .audio-player audio {
+      width: 100%;
+      border: 2px solid #d4af37;
+      border-radius: 8px;
+      padding: 8px;
+      background-color: #fffef8;
+    }
+  </style>
+</head>
+<body class="page-body">
+
+<!-- Player de Áudio Oculto -->
+<audio id="audio" loop>
+  <source src="{{ url_for('static', filename='audio/miserere_mei_deus.mp3') }}" type="audio/mpeg">
+  Seu navegador não suporta o elemento de áudio.
+</audio>
+
+<!-- Conteúdo Principal -->
+<div class="container my-5">
+  <div class="icon">
+    <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+  </div>
+  <h1 class="title">📜 Exame de Consciência</h1>
+  <form method="POST" id="form-pecados">
+    {% for mandamento, lista in pecados.items() %}
+    <div class="card mb-3 card-section">
+      <div class="card-header fw-bold section-title">{{ mandamento }}</div>
+      <div class="card-body">
+        {% for pecado in lista %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="{{ mandamento }}" value="{{ loop.index0 }}" id="{{ mandamento }}-{{ loop.index0 }}" />
+          <label class="form-check-label" for="{{ mandamento }}-{{ loop.index0 }}">{{ pecado }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="mb-3">
+      <label for="custom" class="form-label fw-bold">Outro(s) pecado(s) que deseja digitar:</label>
+      <textarea class="form-control" id="custom" name="custom" rows="3" placeholder="Digite livremente..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Gerar minha lista</button>
+  </form>
+
+  {% if resultado %}
+  <hr class="my-5" />
+  <h2 class="section-title">📄 Seus pecados selecionados:</h2>
+  <form method="POST" action="/download" id="form-download">
+    <input type="hidden" name="html_conteudo" id="html_conteudo" />
+
+    <ul class="list-group my-3 list-peccados">
+      {% for mandamento, lista in resultado.items() %}
+      <li class="list-group-item list-header">{{ mandamento }}</li>
+      {% for item in lista %}
+      <li class="list-group-item list-item">{{ item }}</li>
+      {% endfor %}
+      {% endfor %}
+    </ul>
+
+    <button type="submit" class="btn btn-success">📅 Baixar lista como PDF</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Script para geração do PDF -->
+<script>
+  document.getElementById('form-download')?.addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    let listaHTML = `<div class="icon">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    <h1>Exame de Consciência</h1>`;
+
+    {% for mandamento, lista in resultado.items() %}
+      listaHTML += `<h2>{{ mandamento }}</h2><ul>`;
+      {% for item in lista %}
+        listaHTML += `<li>{{ item }}</li>`;
+      {% endfor %}
+      listaHTML += "</ul>";
+    {% endfor %}
+
+    const css = `
+      body {
+        font-family: Georgia, serif;
+        padding: 40px;
+        color: #333;
+        background-color: #fffef8;
+      }
+      h1 {
+        text-align: center;
+        color: #6a4f28;
+        margin-bottom: 30px;
+      }
+      h2 {
+        color: #4a3820;
+        margin-top: 30px;
+      }
+      ul {
+        list-style-type: square;
+        padding-left: 20px;
+      }
+      .icon {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .icon img {
+        width: 120px;
+        border-radius: 10px;
+        border: 3px solid #d4af37;
+      }
+    `;
+
+    document.getElementById('html_conteudo').value = `
+      <!DOCTYPE html>
+      <html lang="pt-br">
+      <head>
+        <meta charset="UTF-8" />
+        <style>${css}</style>
+      </head>
+      <body>
+        ${listaHTML}
+      </body>
+      </html>
+    `;
+
+    this.submit();
+  });
+</script>
+
+<!-- Botão Flutuante -->
+<style>
+  .floating-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #d4af37;
+    color: #4a3820;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 9999;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .floating-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .dropdown-menu {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 9998;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    width: 250px;
+  }
+
+  .dropdown-item {
+    text-decoration: none;
+    color: #4a3820;
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 6px;
+    background-color: #fffef8;
+    border: 1px solid #d4af37;
+    transition: all 0.2s ease;
+  }
+
+  .dropdown-item:hover {
+    background-color: #b38c1a;
+    color: white;
+  }
+</style>
+
+<!-- Botão Flutuante -->
+<button id="floatingBtn" class="floating-btn">📖</button>
+
+<!-- Menu Suspenso -->
+<div id="dropdownMenu" class="dropdown-menu">
+  <a href="/oracoes#Ato-de-Contricao" class="dropdown-item">Ato de Contrição</a>
+  <a href="/liturgia" class="dropdown-item">Liturgia do Dia</a>
+  <a href="/terco" class="dropdown-item">Santo Rosário</a>
+  <a href="/oracoes#Oracao-do-Arrependimento" class="dropdown-item">Oração do Arrependimento</a>
+  <a href="/oracoes#Confissao-Geral" class="dropdown-item">Confissão Geral</a>
+  <a href="/oracoes#Miserere-Mei-Deus" class="dropdown-item">Miserere Mei Deus</a>
+  <a href="/oracoes#Do-Profundo" class="dropdown-item">Do Profundo</a>
+  <a href="/oracoes#Salmo-6" class="dropdown-item">Salmo 6</a>
+  <a href="/oracoes#Oracao-a-Virgem-Maria" class="dropdown-item">Oração à Virgem Maria</a>
+  <a href="/salmos#Salmos-e-Cifras-Sacras" class="dropdown-item">Salmos e Cifras Sacras</a>
+  <a href="/catequese" class="dropdown-item">🎧Conhecendo a Fé Católica</a>
+</div>
+
+<!-- Script para tocar áudio na primeira interação -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    let audioTocado = false;
+    const audio = document.getElementById('audio');
+
+    function initAudio() {
+      if (!audioTocado && audio && audio.src) {
+        // Evita bloqueio de áudio
+        audio.muted = true;
+        audio.play()
+          .then(() => {
+            console.log("Áudio iniciado com sucesso");
+            audio.muted = false;
+            audioTocado = true;
+          })
+          .catch(err => {
+            console.error("Erro ao iniciar o áudio:", err);
+          });
+      }
+    }
+
+    // Iniciar áudio com qualquer interação do usuário
+    window.addEventListener('click', initAudio);
+    window.addEventListener('touchstart', initAudio);
+
+    // Garantir que o áudio seja iniciado quando o botão flutuante for clicado
+    const floatingBtn = document.getElementById('floatingBtn');
+    if (floatingBtn) {
+      floatingBtn.addEventListener('click', initAudio);
+    }
+  });
+</script>
+
+<!-- Script para mostrar/ocultar menu flutuante -->
+<script>
+  const btn = document.getElementById('floatingBtn');
+  const dropdown = document.getElementById('dropdownMenu');
+
+  btn.addEventListener('click', () => {
+    dropdown.style.display = dropdown.style.display === 'flex' ? 'none' : 'flex';
+  });
+
+  window.addEventListener('click', (e) => {
+    if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+</script>
+</body>
+</html>

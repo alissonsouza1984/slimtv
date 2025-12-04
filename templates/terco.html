@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Santo Rosário – Guia Completo</title>
+  <style>
+    body {
+      background: #faf7f1;
+      font-family: "Georgia", serif;
+      color: #4a3820;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      line-height: 1.8;
+    }
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h2, h3 {
+      color: #6a4f28;
+    }
+    .card-terco {
+      background-color: #fffef8;
+      margin-bottom: 3rem;
+      padding: 1.5rem;
+      border-left: 5px solid #d4af37;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+      transition: box-shadow 0.3s ease;
+    }
+    .card-terco:hover {
+      box-shadow: 0 0 18px rgba(212, 175, 55, 0.35);
+    }
+    .card-terco h3 {
+      color: #4a3820;
+      font-weight: 900;
+      font-size: 1.6rem;
+      margin-bottom: 0.8rem;
+      font-family: "Georgia", serif;
+      text-shadow: 0 0 4px #bfa036;
+    }
+    .titulo-terco {
+      font-size: 2.5rem;
+      font-weight: 900;
+      text-align: center;
+      margin: 2rem 0;
+      color: #6a4f28;
+      text-shadow: 1px 1px 2px #bfa036;
+      font-family: "Georgia", serif;
+    }
+    .versiculo {
+      font-style: italic;
+      margin: 10px 0;
+      color: #555;
+      background-color: #f0e6d2;
+      padding: 1rem;
+      border-left: 3px solid #8B4513;
+      border-radius: 4px;
+    }
+    .explicacao, .meditacao {
+      margin: 10px 0 20px 0;
+      padding-left: 15px;
+      border-left: 3px solid #8B4513;
+      background: #f0e6d2;
+      color: #4a3820;
+      border-radius: 4px;
+    }
+    .terco-imagem {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .terco-imagem img {
+      max-width: 200px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+      border: 3px solid gold;
+    }
+    .introducao-rosario {
+      background: #f0e6d2;
+      border-left: 6px solid #8B4513;
+      padding: 25px 20px;
+      margin-bottom: 40px;
+      border-radius: 12px;
+    }
+    .passo-a-passo {
+      background-color: #f0e6d2;
+      padding: 1rem;
+      border-left: 3px solid #b38c1a;
+      border-radius: 4px;
+      font-style: italic;
+      color: #555;
+      margin-top: 1rem;
+    }
+    .contemplacao {
+      background-color: #f0e6d2;
+      padding: 1rem;
+      border-left: 3px solid #228B22;
+      border-radius: 4px;
+      margin-top: 1rem;
+      font-style: italic;
+      color: #2a5d2e;
+    }
+    .audio-player {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .audio-player audio {
+      width: 100%;
+      max-width: 600px;
+      height: 50px;
+      border: 2px solid #d4af37;
+      border-radius: 8px;
+      padding: 5px;
+      background-color: #fffef8;
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+    }
+    .audio-player audio:hover,
+    .audio-player audio:focus {
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.8);
+    }
+    a.back-link {
+      display: inline-block;
+      margin-top: 40px;
+      color: #8B4513;
+      text-decoration: none;
+      font-weight: bold;
+      font-family: "Georgia", serif;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.3s ease;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+    }
+    a.back-link:hover {
+      border-color: #d4af37;
+      text-decoration: none;
+      background-color: #f0e6d2;
+    }
+    audio {
+      width: 100%;
+      margin: 15px 0;
+    }
+    ol > li {
+      margin-bottom: 2rem;
+    }
+    .imagem-cristo {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .imagem-cristo img {
+      max-width: 200px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+      border: 3px solid gold;
+    }
+    .titulo-liturgia {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: bold;
+      color: #6a4f28;
+      margin: 1.5rem 0;
+      font-family: "Georgia", serif;
+      display: none;
+    }
+    ul {
+      margin-bottom: 1rem;
+    }
+    li {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Imagem Inicial -->
+    <div class="imagem-cristo">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    
+    <!-- Título abaixo da imagem -->
+    <div class="titulo-liturgia">Santo Rosário</div>
+
+    <!-- Título -->
+    <h1 class="titulo-terco">🕊️ SANTO ROSÁRIO – GUIA COMPLETO</h1>
+    
+    <!-- Passos do Terço -->
+    <div class="card-terco">
+      <h3>1. Sinal da Cruz</h3>
+      <p>Pelo sinal da santa cruz, livrai-nos, Deus, nosso Senhor, dos nossos inimigos. Em nome do Pai, e do Filho, e do Espírito Santo. Amém.</p>
+      <div class="passo-a-passo">
+        ✅ Toque a testa no "Pai", o peito no "Filho", o ombro esquerdo e depois o direito no "Espírito Santo".
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>2. Oferecimento do Terço</h3>
+      <p>
+        Divino Jesus, nós Vos oferecemos este terço que vamos rezar, meditando nos mistérios da nossa redenção.
+        Concedei-nos, pela intercessão da Virgem Maria, Mãe de Deus e nossa Mãe, as virtudes necessárias para
+        bem rezá-lo e a graça de alcançarmos as indulgências desta santa devoção.
+      </p>
+      <h4>📿 Intenções</h4>
+      <p>Oferecemos, particularmente:</p>
+      <ul>
+        <li>Em desagravo dos pecados cometidos contra o Santíssimo Coração de Jesus e o Imaculado Coração de Maria;</li>
+        <li>Pela paz no mundo e pela conversão dos pecadores;</li>
+        <li>Pelas almas do purgatório;</li>
+        <li>Pelas intenções do Papa Leão XIV;</li>
+        <li>Pelo aumento e santificação do clero;</li>
+        <li>Pelo nosso vigário;</li>
+        <li>Pela santificação e união das famílias;</li>
+        <li>Pelas missões e missionários;</li>
+        <li>Pelos enfermos e agonizantes;</li>
+        <li>Por todos que pediram nossas orações;</li>
+        <li>Por nossas intenções mais íntimas e urgentes;</li>
+        <li>Pelo Brasil.</li>
+      </ul>
+      <div class="passo-a-passo">
+        ✅ Reze com atenção e amor. Ofereça este terço por alguém especial.
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>3. Credo (Profissão de Fé)</h3>
+      <p>
+        <strong>Creio em Deus Pai todo-poderoso, criador do céu e da terra;</strong> e em Jesus Cristo, seu único Filho, nosso Senhor;
+        que foi concebido pelo poder do Espírito Santo, nasceu da Virgem Maria, padeceu sob Pôncio Pilatos, foi crucificado,
+        morto e sepultado, desceu à mansão dos mortos, ressuscitou ao terceiro dia, subiu aos céus, está sentado à direita
+        de Deus Pai todo-poderoso, donde há de vir a julgar os vivos e os mortos.
+      </p>
+      <p>
+        <strong>Creio no Espírito Santo,</strong> na santa Igreja Católica, na comunhão dos santos, na remissão dos pecados,
+        na ressurreição da carne, na vida eterna. Amém.
+      </p>
+      <div class="passo-a-passo">
+        ✅ Diga com fé: você está confessando sua crença em tudo que a Igreja ensina.
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>4. Pai-Nosso</h3>
+      <p><strong>Pai nosso que estais no céu,</strong> santificado seja o vosso nome;</p>
+      <p>venha a nós o vosso reino;</p>
+      <p>seja feita a vossa vontade, assim na terra como no céu;</p>
+      <p>o pão nosso de cada dia nos dai hoje;</p>
+      <p>perdoai-nos as nossas ofensas, assim como nós perdoamos a quem nos tem ofendido;</p>
+      <p>e não nos deixeis cair em tentação,</p>
+      <p>mas livrai-nos do mal. Amém.</p>
+      <div class="passo-a-passo">
+        ✅ Reze com atenção. Peça a Deus: "Que eu viva com santidade hoje."
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>5. Três Ave-Marias – Louvor à Santíssima Trindade</h3>
+      <p>Reze com devoção:</p>
+      <ul>
+        <li>Uma Ave-Maria em louvor a Deus Pai</li>
+        <li>Uma Ave-Maria em louvor a Deus Filho</li>
+        <li>Uma Ave-Maria em louvor ao Espírito Santo</li>
+      </ul>
+      <p class="opcional"><strong>📌 Oração do Angelus (opcional):</strong></p>
+      <p><strong>O Anjo do Senhor anunciou a Maria,</strong> e ela concebeu do Espírito Santo.</p>
+      <p>Ave Maria...</p>
+      <p><strong>Eis aqui a serva do Senhor,</strong> faça-se em mim segundo a Vossa palavra.</p>
+      <p>Ave Maria...</p>
+      <p><strong>E o Verbo de Deus se fez carne,</strong> e habitou entre nós.</p>
+      <p>Ave Maria...</p>
+      <p><strong>V.</strong> Rogai por nós, Santa Mãe de Deus.</p>
+      <p><strong>R.</strong> Para que sejamos dignos das promessas de Cristo.</p>
+      <p><strong>Amém.</strong></p>
+      <div class="passo-a-passo">
+        ✅ Reze as três Ave-Marias com atenção e amor. Se desejar, pode incluir a Oração do Angelus.
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>6. Ave-Marias (10 vezes por mistério)</h3>
+      <p>
+        <strong>Ave Maria, cheia de graça, o Senhor é convosco;</strong> bendita sois vós entre as mulheres,
+        e bendito é o fruto do vosso ventre, Jesus.
+      </p>
+      <p>
+        <strong>Santa Maria, Mãe de Deus,</strong> rogai por nós pecadores, agora e na hora da nossa morte. Amém.
+      </p>
+      <div class="passo-a-passo">
+        ✅ Reze 10 vezes por cada mistério, pedindo: "Santa Maria, ajude-me a viver como Jesus."
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>7. GLÓRIA AO PAI</h3>
+      <p><strong>Glória ao Pai, ao Filho e ao Espírito Santo.</strong> Como era no princípio, agora e sempre. Amém.</p>
+      <div class="passo-a-passo">
+        ✅ Reze com alegria. Diga: "Eu agradeço a Deus por tudo!"
+      </div>
+    </div>
+    <div class="card-terco">
+      <h3>8. JACULATÓRIA</h3>
+      <p><strong>Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu e socorrei principalmente as que mais precisarem.</strong></p>
+      <div class="passo-a-passo">
+        ✅ Peça com fé. Pense nas pessoas que precisam de ajuda espiritual.
+      </div>
+    </div>
+    <!-- SALVE RAINHA -->
+    <div class="card-terco">
+      <h3>🕊️ Salve Rainha</h3>
+      <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+      <p>Em nossas dores e angústias, nós aclamamos e suplicamos, pedindo teu olhar compassivo e tua poderosa intercessão junto ao teu Filho Jesus.</p>
+      <p><strong>Ó clemente, ó piedosa, ó doce sempre Virgem Maria!</strong></p>
+      <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+      <p>
+        <em>Maria, Mãe do Redentor e nossa Mãe, ajuda-nos a crescer em fé, esperança e amor, para sermos fiéis discípulos do teu Filho Jesus Cristo.</em>
+      </p>
+    </div>
+    <!-- MISTÉRIOS GOZOSOS -->
+    <div class="card-terco">
+      <h3>📜 Mistérios Gozosos</h3>
+      <div class="audio-player">
+        <audio controls>
+          <source src="{{ url_for('static', filename='audio/terco/goz.mp3') }}" type="audio/mpeg" />
+          Seu navegador não suporta o elemento de áudio.
+        </audio>
+      </div>
+      <ol>
+        <li>
+          <strong> A Anunciação do Anjo a Maria</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/anunciacao.png') }}" alt="Anunciação do Anjo a Maria" />
+          </div>
+          <div class="versiculo">Lc 1, 26-38 – “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.”</div>
+          <div class="explicacao">
+            <p>Na Anunciação, contemplamos o Verbo eterno que se faz carne no ventre da Virgem Maria, por obra do Espírito Santo. Maria, cheia de graça, responde com um “sim” confiante, acolhendo a vontade de Deus. Que, ao meditar este mistério, saibamos dizer como ela: “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.</p>
+          </div>
+          <div class="meditacao">
+          <p><strong>Ó Maria, humilde serva do Altíssimo,</strong><br>
+          escolhida para ser Mãe do Salvador, tu acolheste com fé o plano de Deus.<br>
+          Tu que disseste "sim" sem reservas, ensina-nos também a confiar, mesmo sem entender.<br>
+          Guia-nos no caminho da humildade, da obediência e do amor verdadeiro.<br>
+          Intercede por nós junto ao teu Filho, para que sejamos fiéis à vontade do Pai.<br>
+          Amém.</p>
+          </div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>A Visitação de Maria a Isabel</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/visitacao.png') }}" alt="Visitação de Maria a Isabel" />
+          </div>
+          <div class="versiculo">Lc 1, 39-45 – “Bendita és tu entre as mulheres...”</div>
+          <div class="explicacao">
+            <p>Ao visitar Isabel, Maria expressa a caridade cristã em ação...</p>
+          </div>
+          <div class="meditacao">Senhor, que possamos reconhecer e anunciar a tua presença em nossa vida com fé, humildade e amor, assim como Maria o fez.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>O Nascimento de Jesus em Belém</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/nascimento.png') }}" alt="Nascimento de Jesus em Belém" />
+          </div>
+          <div class="versiculo">Lc 2, 1-20 – “Nasceu para vós um Salvador, que é Cristo Senhor.”</div>
+          <div class="explicacao">
+            <p>O nascimento humilde de Jesus em Belém é a manifestação do Deus infinito em um pequeno e frágil menino. Deus se faz próximo, toca a nossa realidade humana e se apresenta como Salvador. Este mistério nos chama a reconhecer o divino nas situações simples e humildes de nossas vidas, e a acolher o Cristo que nasce em nossos corações.</p>
+          </div>
+          <div class="meditacao">Jesus, que nasceste entre nós em simplicidade e amor, ensina-nos a humildade e a disponibilidade para acolher-te em cada momento da nossa vida.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>A Apresentação de Jesus no Templo</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/apresentacao.png') }}" alt="Apresentação de Jesus no Templo" />
+          </div>
+          <div class="versiculo">Lc 2, 22-35 – “Este menino é sinal de contradição.”</div>
+          <div class="explicacao">
+            <p>Na apresentação, Jesus é consagrado a Deus segundo a Lei de Moisés. Simeão e Ana, homens e mulheres de fé profunda, reconhecem em Jesus a luz para revelação às nações e a glória do povo de Israel. Este mistério destaca a missão do Cristo como luz que ilumina as trevas e provoca decisões radicais, pois Ele é um sinal de contradição.</p>
+          </div>
+          <div class="meditacao">Senhor Jesus, ajuda-nos a ser luz no mundo, mesmo quando teu caminho nos desafia a enfrentar contradições e dificuldades.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>O Encontro de Jesus no Templo aos 12 anos</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/templo.png') }}" alt="Jesus no Templo aos 12 anos" />
+          </div>
+          <div class="versiculo">Lc 2, 41-52 – “Não sabíeis que devo estar na casa de meu Pai?”</div>
+          <div class="explicacao">
+            <p>Este episódio revela a consciência precoce de Jesus sobre sua missão divina. Mesmo na juventude, Ele se dedica ao diálogo com Deus no templo, deixando-nos o exemplo da busca constante pela sabedoria e intimidade com o Pai. Também nos recorda a importância de buscar discernimento em nossas vidas espirituais.</p>
+          </div>
+          <div class="meditacao">Espírito Santo, ilumina nossa mente e fortalece nosso coração para que, como Jesus, sejamos fiéis à vontade do Pai e busquemos sempre a verdade.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+      </ol>
+    </div>
+    <!-- MISTÉRIOS DOLOROSOS -->
+    <div class="card-terco">
+      <h3>🔥 Mistérios Dolorosos</h3>
+      <strong>Jesus Agonia no Horto</strong>
+      <div class="terco-imagem">
+        <img src="{{ url_for('static', filename='img/terco/horto.png') }}" alt="Jesus Agonia no Horto" />
+        <div class="audio-player">
+          <audio controls>
+            <source src="{{ url_for('static', filename='audio/terco/dor.mp3') }}" type="audio/mpeg" />
+            Seu navegador não suporta o elemento de áudio.
+          </audio>
+        </div>
+      </div>
+      <ol>
+        <li>
+          <div class="versiculo">Mt 26, 36-46 – “Meu Pai, se é possível, afaste de mim este cálice.”</div>
+          <div class="explicacao">
+            <p>Aqui vemos a humanidade dolorosa de Jesus diante do sofrimento iminente. Sua agonia é a entrega total ao mistério da paixão, na qual aceita livremente a vontade do Pai para a salvação do mundo. É o exemplo máximo de oração e abandono confiantes a Deus, mesmo em meio à angústia.</p>
+          </div>
+          <div class="meditacao">Jesus, Mestre da oração, ensina-nos a buscar força na intimidade com Deus e a entregar nossas dores à Sua vontade amorosa.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Jesus é Açoitado</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/acoites.png') }}" alt="Jesus é Açoitado" />
+          </div>
+          <div class="versiculo">Jo 19, 1-5 – “Eis o homem!”</div>
+          <div class="explicacao">
+            <p>O açoite sofrido por Jesus revela a injustiça e o sofrimento infligidos por amor a nós. É um momento que expressa o preço da redenção e o imenso amor que se entrega, apesar da dor e humilhação. Nos chama a reconhecer o valor do sacrifício e a união com Cristo na cruz.</p>
+          </div>
+          <div class="meditacao">Senhor, fortalece-nos na prova e ajuda-nos a carregar com amor as cruzes da vida, unindo-as ao teu sofrimento redentor.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Jesus é Coroado de Espinhos</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/espinhos.png') }}" alt="Jesus Coroado de Espinhos" />
+          </div>
+          <div class="versiculo">Jo 19, 2-3 – “Eles teceram uma coroa de espinhos e a puseram sobre a cabeça de Jesus.”</div>
+          <div class="explicacao">
+            <p>A coroa de espinhos simboliza o desprezo e o sofrimento que Jesus suportou por nós. É um sinal de sua realeza espiritual e do amor que vence o ódio. Este mistério nos convida a assumir a cruz com coragem, seguindo o Rei dos reis que se fez servo.</p>
+          </div>
+          <div class="meditacao">Rei crucificado, ensina-nos a humildade e o amor que se sacrificam pelo bem dos irmãos.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Jesus Carrega a Cruz</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/cruz.png') }}" alt="Jesus Carrega a Cruz" />
+          </div>
+          <div class="versiculo">Lc 23, 26-32 – “Tomai a vossa cruz e segui-me.”</div>
+          <div class="explicacao">
+            <p>No caminho do Calvário, Jesus nos mostra a entrega total, o amor que assume o sofrimento por amor ao Pai e aos homens. A cruz é o sinal da vitória definitiva sobre o pecado e a morte, e um chamado a segui-lo com fé e perseverança.</p>
+          </div>
+          <div class="meditacao">Senhor Jesus, ajuda-nos a carregar a cruz com esperança, imitando tua obediência e amor infinitos.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Jesus é Crucificado</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/crucificacao.png') }}" alt="Jesus é Crucificado" />
+          </div>
+          <div class="versiculo">Lc 23, 33-43 – “Pai, perdoa-lhes, porque não sabem o que fazem.”</div>
+          <div class="explicacao">
+            <p>Na cruz, Jesus nos revela o ápice do amor e do perdão, entregando sua vida para a salvação do mundo. Sua compaixão pelos que o crucificam é convite à conversão e à misericórdia verdadeira. Este mistério é a chave do cristianismo: amor que vence o ódio.</p>
+          </div>
+          <div class="meditacao">Senhor crucificado, ensina-nos a amar e perdoar como tu, mesmo em meio às dores da vida.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+      </ol>
+    </div>
+    <!-- MISTÉRIOS GLORIOSOS -->
+    <div class="card-terco">
+      <h3>🕊️ Mistérios Gloriosos</h3>
+      <strong>Ressurreição de Jesus</strong>
+      <div class="terco-imagem">
+        <img src="{{ url_for('static', filename='img/terco/ressurreicao.png') }}" alt="Ressurreição de Jesus" />
+      </div>
+      <div class="audio-player">
+        <audio controls>
+          <source src="{{ url_for('static', filename='audio/terco/glo.mp3') }}" type="audio/mpeg" />
+          Seu navegador não suporta o elemento de áudio.
+        </audio>
+      </div>
+      <ol>
+        <li>
+          <div class="versiculo">Lc 24, 1-12 – “Ele não está aqui; ressuscitou!”</div>
+          <div class="explicacao">
+            <p>A Ressurreição é o centro da nossa fé: a vitória de Cristo sobre a morte e o pecado. Ela inaugura a nova criação e a esperança da vida eterna para todos os que creem. É a confirmação de que o amor divino é mais forte que a morte e que somos chamados à vida nova.</p>
+          </div>
+          <div class="meditacao">Jesus ressuscitado, enche-nos de esperança e alegria para vivermos na luz da tua vitória.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Ascensão de Jesus</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/ascensao.png') }}" alt="Ascensão de Jesus" />
+          </div>
+          <div class="versiculo">Mc 16, 19-20 – “O Senhor Jesus, depois de falar com eles, foi elevado ao céu.”</div>
+          <div class="explicacao">
+            <p>A Ascensão revela a exaltação de Cristo à direita do Pai, glorificado e Senhor de tudo. É o início da missão da Igreja no mundo, guiada pelo Espírito Santo, para levar a mensagem de salvação a todas as nações.</p>
+          </div>
+          <div class="meditacao">Senhor glorioso, ajuda-nos a ser testemunhas fiéis da tua palavra e promessas até os confins da terra.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Descida do Espírito Santo</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/espirito_santo.png') }}" alt="Descida do Espírito Santo" />
+          </div>
+          <div class="versiculo">At 2, 1-4 – “De repente, veio do céu um som como de um vento impetuoso.”</div>
+          <div class="explicacao">
+            <p>O Espírito Santo desce sobre os apóstolos, dando-lhes coragem e poder para anunciar o Evangelho. É o início da Igreja missionária e o dom que nos sustenta na fé e na caridade.</p>
+          </div>
+          <div class="meditacao">Espírito Santo, enche-nos de teus dons para que sejamos verdadeiros instrumentos de paz e amor.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Assunção de Maria</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/assuncao.png') }}" alt="Assunção de Maria" />
+          </div>
+          <div class="versiculo">Ap 12, 1 – “Apareceu no céu uma mulher revestida de sol, com a lua debaixo dos pés e uma coroa de doze estrelas na cabeça.”</div>
+          <div class="explicacao">
+            <p>A Assunção proclama que Maria, preservada de toda mancha de pecado, foi elevada em corpo e alma à glória celestial. Ela é o modelo da Igreja em sua esperança na ressurreição e na plenitude da vida eterna.</p>
+          </div>
+          <div class="meditacao">Mãe celeste, ensina-nos a confiar na promessa da vida eterna e a viver com os olhos fixos no céu.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Coroação de Maria</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/coroacao.png') }}" alt="Coroação de Maria" />
+          </div>
+          <div class="versiculo">Ap 12, 1 – “Vi uma mulher coroada com doze estrelas.”</div>
+          <div class="explicacao">
+            <p>Maria é coroada Rainha do Céu e da Terra, glorificada por seu papel único na história da salvação. Sua maternidade espiritual nos convida a buscar sua intercessão e a imitar suas virtudes para sermos participantes da glória divina.</p>
+          </div>
+          <div class="meditacao">Rainha do céu, guia-nos pelo caminho da santidade e faz-nos fiéis discípulos de teu Filho.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+      </ol>
+    </div>
+    <!-- MISTÉRIOS LUMINOSOS -->
+    <div class="card-terco">
+      <h3>💡 Mistérios Luminosos</h3>
+      <strong>Batismo de Jesus no Jordão</strong>
+      <div class="terco-imagem">
+        <img src="{{ url_for('static', filename='img/terco/batismo.png') }}" alt="Batismo de Jesus no Jordão" />
+        <div class="audio-player">
+          <audio controls>
+            <source src="{{ url_for('static', filename='audio/terco/lum.mp3') }}" type="audio/mpeg" />
+            Seu navegador não suporta o elemento de áudio.
+          </audio>
+        </div>
+      </div>
+      <ol>
+        <li>
+          <div class="versiculo">Mt 3, 13-17 – “Este é o meu Filho amado, em quem me comprazo.”</div>
+          <div class="explicacao">
+            <p>No Batismo, Jesus inaugura sua missão messiânica e nos mostra o caminho da obediência e da fidelidade ao Pai. É também a manifestação da Santíssima Trindade e o convite a uma vida nova no Espírito.</p>
+          </div>
+          <div class="meditacao">Pai amado, ajuda-nos a renovar nosso batismo, vivendo em fidelidade e entrega ao teu Filho Jesus.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Bodas de Caná</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/bodas.png') }}" alt="Bodas de Caná" />
+          </div>
+          <div class="versiculo">Jo 2, 1-11 – “Fazei tudo o que Ele vos disser.”</div>
+          <div class="explicacao">
+            <p>O primeiro milagre de Jesus revela sua glória e seu poder de transformação. Maria, intercedendo junto a Jesus, nos ensina a confiança na sua palavra e no seu agir em nossas vidas.</p>
+          </div>
+          <div class="meditacao">Mãe de Deus, ensina-nos a confiar sempre no teu Filho e a obedecer sua vontade.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Anúncio do Reino de Deus</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/reino.png') }}" alt="Anúncio do Reino de Deus" />
+          </div>
+          <div class="versiculo">Mt 4, 17 – “Arrependei-vos, porque o Reino dos Céus está próximo.”</div>
+          <div class="explicacao">
+            <p>Jesus proclama a chegada do Reino, chamando-nos à conversão e a uma vida nova. Este mistério nos chama a assumir uma postura ativa e comprometida com o Evangelho.</p>
+          </div>
+          <div class="meditacao">Senhor, converte nossos corações para vivermos na plenitude do teu Reino.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Transfiguração de Jesus</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/transfiguracao.png') }}" alt="Transfiguração de Jesus" />
+          </div>
+          <div class="versiculo">Mt 17, 1-9 – “Este é o meu Filho amado. Escutai-o.”</div>
+          <div class="explicacao">
+            <p>Na Transfiguração, Jesus revela sua divindade plena aos apóstolos, preparando-os para a paixão. É um chamado à fé e ao seguimento atento da palavra de Deus.</p>
+          </div>
+          <div class="meditacao">Senhor transfigurado, abre nossos olhos para ver tua glória e escutar tua voz.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+        <li>
+          <strong>Instituição da Eucaristia</strong>
+          <div class="terco-imagem">
+            <img src="{{ url_for('static', filename='img/terco/eucaristia.png') }}" alt="Instituição da Eucaristia" />
+          </div>
+          <div class="versiculo">Lc 22, 19-20 – “Isto é o meu corpo, entregue por vós. Fazei isto em memória de mim.”</div>
+          <div class="explicacao">
+            <p>Na Última Ceia, Jesus nos dá o Sacramento da Eucaristia, verdadeiro memorial de seu sacrifício e presença real. É o dom maior para a vida da Igreja e de cada cristão.</p>
+          </div>
+          <div class="meditacao">Jesus sacramentado, ensina-nos a participar com fé e amor do teu banquete divino.</div>
+          <p><strong>Reze:</strong></p>
+          <ul style="margin-left: 1.5rem;">
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+          </ul>
+          <div class="versiculo">
+            <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+          </div>
+          <div class="versiculo">
+            <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+          </div>
+          <div class="versiculo">
+            <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+          </div>
+          <div class="passo-a-passo">
+            ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+          </div>
+        </li>
+      </ol>
+    </div>
+    <!-- SALVE RAINHA -->
+    <div class="card-terco">
+      <h3>🕊️ Salve Rainha</h3>
+      <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+      <p>Em nossas dores e angústias, nós aclamamos e suplicamos, pedindo teu olhar compassivo e tua poderosa intercessão junto ao teu Filho Jesus.</p>
+      <p><strong>Ó clemente, ó piedosa, ó doce sempre Virgem Maria!</strong></p>
+      <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+      <p>
+        <em>Maria, Mãe do Redentor e nossa Mãe, ajuda-nos a crescer em fé, esperança e amor, para sermos fiéis discípulos do teu Filho Jesus Cristo.</em>
+      </p>
+    </div>
+    <!-- Introdução ao Rosário -->
+    <div class="card-terco">
+      <h2>🙏 Origem do Santo Rosário</h2>
+      <p>
+        O Rosário é uma das devoções mais queridas e difundidas na espiritualidade católica. Ele é uma oração contemplativa que convida o fiel a meditar profundamente os mistérios da vida de Jesus Cristo e de sua Santíssima Mãe, Maria, com o auxílio das orações tradicionais do Pai Nosso, Ave Maria e Glória ao Pai.
+      </p>
+      <p>
+        Historicamente, o Rosário tem raízes que remontam aos tempos medievais, com a prática dos monges de recitar as 150 Salmos. Para os fiéis leigos, que não sabiam ler, foi introduzido o costume de rezar 150 Ave Marias, divididas em grupos, formando assim o que viria a ser o Rosário.
+      </p>
+      <p>
+        A estrutura atual do Rosário foi consolidada por São Domingos de Gusmão, no século XIII, que, segundo a tradição, recebeu a devoção em uma aparição da Virgem Maria, pedindo que fosse difundida como um poderoso meio de conversão e oração.
+      </p>
+      <p>
+        O Rosário é também uma síntese do Evangelho, pois cada mistério reflete episódios centrais da vida de Cristo: sua Encarnação, Paixão, Ressurreição, entre outros. Através da repetição das orações, o fiel é convidado a entrar em um ritmo de contemplação que transforma a mente e o coração.
+      </p>
+      <p>
+        Grandes santos como São Luís Maria Grignion de Montfort, São João Paulo II e Santa Teresa de Ávila testemunharam o poder do Rosário em suas vidas espirituais, ensinando que esta oração não é apenas palavras repetidas, mas um caminho seguro para crescer em intimidade com Deus e com Maria.
+      </p>
+      <p>
+        São João Paulo II, em sua Carta Apostólica <em>Rosarium Virginis Mariae</em> (2002), destacou que o Rosário é um compêndio do Evangelho, “uma oração mariana que sempre foi profundamente cristocêntrica”. Ele incentivou os fiéis a redescobrir esta bela prática para fortalecer a fé, obter graças e perseverar no caminho da santidade.
+      </p>
+      <p>
+        Por isso, ao rezar o Rosário, somos convidados a imitar Maria, a humilde serva do Senhor, que meditou no seu coração todos os mistérios da salvação. É um convite para entrarmos no mistério divino, permitindo que a Palavra de Deus transforme a nossa vida.
+      </p>
+      <p>
+        Que esta meditação seja um caminho de paz, luz e renovação interior, levando cada um de nós a uma experiência viva do amor de Deus.
+      </p>
+    </div>
+    <a href="/" class="back-link">← Voltar ao Exame de Consciência</a>
+  </div>
+</body>
+</html>

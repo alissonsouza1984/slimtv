@@ -1,0 +1,23 @@
+{
+  "name": "Liturgia Diária",
+  "short_name": "Liturgia",
+  "description": "Acompanhe a liturgia diária com leituras, orações e salmos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fffef8",
+  "theme_color": "#d4af37",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/img/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "scope": "/"
+}

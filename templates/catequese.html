@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Conhecendo a Fé Católica</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" type="image/x-icon">
+  <style>
+    body {
+      background: #faf7f1;
+      font-family: "Georgia", serif;
+      color: #4a3820;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      line-height: 1.8;
+    }
+    header {
+      background: #fffef8;
+      color: #6a4f28;
+      text-align: center;
+      padding: 2rem 1rem;
+      border-bottom: 3px solid #d4af37;
+      box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+      margin-bottom: 2rem;
+    }
+    header h1 {
+      font-size: 2.5rem;
+      margin: 0;
+      letter-spacing: 2px;
+      text-shadow: 1px 1px 2px #bfa036;
+      font-weight: 900;
+    }
+    header p {
+      margin-top: 0.5rem;
+      font-style: italic;
+      color: #7f6b3b;
+    }
+    .container {
+      width: 90%;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .imagem-cristo {
+      text-align: center;
+      margin: 2rem 0;
+    }
+    .imagem-cristo img {
+      max-width: 200px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+      border: 3px solid gold;
+    }
+    .palestra-item {
+      background-color: #fffef8;
+      margin-bottom: 1.5rem;
+      padding: 1.5rem;
+      border-left: 5px solid #d4af37;
+      border-radius: 12px;
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+      transition: box-shadow 0.3s ease;
+    }
+    .palestra-titulo {
+      font-size: 1.6rem;
+      color: #4a3820;
+      margin: 0 0 0.3rem 0;
+      font-weight: 900;
+      font-family: "Georgia", serif;
+      text-shadow: 0 0 4px #bfa036;
+    }
+
+    /* Player moderno com barra de progresso */
+    .audio-player {
+      width: 100%;
+      max-width: 600px;
+      margin: 1rem 0;
+      background: #f0e6d2;
+      border-radius: 10px;
+      border: 1px solid #d4af37;
+      padding: 12px;
+      box-shadow: inset 0 0 5px rgba(212,175,55,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .play-btn {
+      background-color: goldenrod;
+      color: white;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+    .play-btn:hover {
+      background-color: #bfa036;
+      transform: scale(1.08);
+    }
+    .play-btn:active {
+      transform: scale(0.98);
+    }
+
+    .time-info {
+      display: flex;
+      font-size: 0.85rem;
+      color: #4a3820;
+      min-width: 120px;
+      justify-content: space-between;
+    }
+
+    .progress-container {
+      width: 100%;
+      height: 8px;
+      background: #e0d0b8;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: pointer;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #d4af37, #f0d98f);
+      border-radius: 4px;
+      transition: width 0.1s linear;
+      box-shadow: 0 0 5px rgba(212,175,55,0.4);
+    }
+
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      background: #d4af37;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .progress-container:hover .progress-bar::after {
+      opacity: 1;
+    }
+
+    .loading {
+      font-size: 0.8rem;
+      color: #8B4513;
+      margin-left: 10px;
+      display: none;
+    }
+
+    .btn-resumo-toggle {
+      background: #d4af37;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      font-size: 0.95rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-top: 0.8rem;
+      font-weight: bold;
+    }
+    .btn-resumo-toggle:hover {
+      background: #c19d2f;
+    }
+
+    .resumo {
+      background-color: #fdfaf3;
+      border-left: 4px solid #d4af37;
+      margin-top: 1rem;
+      padding: 1rem 1.2rem;
+      border-radius: 8px;
+      box-shadow: inset 0 0 8px rgba(212,175,55,0.1);
+      font-size: 1rem;
+      color: #3e2e18;
+      text-align: justify;
+      display: none;
+    }
+    .resumo h4 {
+      margin-top: 0;
+      color: #6a4f28;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+    .resumo p {
+      margin: 0.5rem 0 0;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #7f6b3b;
+      font-style: italic;
+      padding: 3rem;
+      background-color: #fffef8;
+      border-radius: 12px;
+      border-left: 5px solid #d4af37;
+    }
+
+    .creditos {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.95rem;
+      color: #7f6b3b;
+    }
+    .creditos a {
+      color: #6a4f28;
+      text-decoration: underline;
+      font-weight: bold;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      margin-top: 3rem;
+      color: #7f6b3b;
+      font-size: 0.9rem;
+      border-top: 1px solid #d4af37;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🎧 Conhecendo a Fé Católica.</h1>
+    <p>Formação e reflexão para a fé Católica</p>
+  </header>
+
+  <div class="container">
+    <div class="imagem-cristo">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+
+    {% if palestras %}
+      {% for palestra in palestras %}
+        <div class="palestra-item">
+          <!-- Título principal -->
+          <h3 class="palestra-titulo">{{ palestra.titulo }}</h3>
+
+          <!-- Player de áudio com barra de progresso -->
+          <div class="audio-player" data-id="{{ palestra.id }}">
+            <div class="player-controls">
+              <button class="play-btn" data-audio="{{ palestra.id }}">
+                ▶
+              </button>
+              <div class="time-info">
+                <span class="current-time">00:00</span>
+                <span class="duration">--:--</span>
+              </div>
+            </div>
+            <div class="progress-container" data-audio="{{ palestra.id }}">
+              <div class="progress-bar" id="progress-{{ palestra.id }}"></div>
+            </div>
+            <div class="loading" id="loading-{{ palestra.id }}">Carregando...</div>
+            <audio
+              class="audio-element"
+              id="audio-{{ palestra.id }}"
+              data-next="{{ loop.nextitem.id if loop.nextitem else None }}"
+              data-filename="{{ palestra.filename }}">
+            </audio>
+          </div>
+
+          <!-- Resumo -->
+          {% if palestra.resumo %}
+            <button class="btn-resumo-toggle" onclick="toggleResumo(this)">
+              📜 Mostrar Resumo
+            </button>
+            <div class="resumo">
+              <h4>Resumo</h4>
+              <p>{{ palestra.resumo | replace('\n', '<br>') | safe }}</p>
+            </div>
+          {% else %}
+            <div class="resumo" style="display: block;">
+              <h4>ℹ️ Sem resumo</h4>
+              <p>Este conteúdo ainda não possui um resumo disponível.</p>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <p>Nenhuma palestra disponível no momento.</p>
+      </div>
+    {% endif %}
+
+    <div class="creditos">
+      <p>Todos os direitos deste conteúdo pertencem ao site <a href="https://padrepauloricardo.org" target="_blank" rel="noopener noreferrer">padrepauloricardo.org</a> — acesse, apoie e assine para ter acesso completo às formações!</p>
+    </div>
+  </div>
+
+  <script>
+    let currentAudio = null;
+
+    // Formata segundos para MM:SS
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return "--:--";
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Atualiza barra de progresso e tempo
+    function setupAudioPlayer(audioId) {
+      const audioElement = document.getElementById(`audio-${audioId}`);
+      const progressBar = document.getElementById(`progress-${audioId}`);
+      const currentTimeEl = audioElement.closest('.audio-player').querySelector('.current-time');
+      const durationEl = audioElement.closest('.audio-player').querySelector('.duration');
+      const loadingEl = document.getElementById(`loading-${audioId}`);
+      const playBtn = document.querySelector(`.play-btn[data-audio="${audioId}"]`);
+      const progressContainer = document.querySelector(`.progress-container[data-audio="${audioId}"]`);
+
+      // Carrega a duração
+      audioElement.onloadedmetadata = () => {
+        durationEl.textContent = formatTime(audioElement.duration);
+      };
+
+      // Atualiza a barra e o tempo atual
+      audioElement.ontimeupdate = () => {
+        const percent = (audioElement.currentTime / audioElement.duration) * 100;
+        progressBar.style.width = `${percent}%`;
+        currentTimeEl.textContent = formatTime(audioElement.currentTime);
+      };
+
+      // Final do áudio → próximo (se existir)
+      audioElement.onended = () => {
+        playBtn.innerHTML = '▶';
+        const nextId = audioElement.dataset.next;
+        if (nextId) {
+          const nextBtn = document.querySelector(`.play-btn[data-audio="${nextId}"]`);
+          if (nextBtn) {
+            setTimeout(() => togglePlay(nextBtn, nextId), 1000);
+          }
+        }
+      };
+
+      // Erro ao carregar
+      audioElement.onerror = () => {
+        loadingEl.style.display = 'none';
+        alert('Erro ao carregar o áudio. Verifique o arquivo.');
+      };
+
+      // Permite pular ao clicar na barra
+      progressContainer.onclick = (e) => {
+        if (audioElement.duration) {
+          const rect = progressContainer.getBoundingClientRect();
+          const percent = (e.clientX - rect.left) / rect.width;
+          audioElement.currentTime = percent * audioElement.duration;
+        }
+      };
+    }
+
+    // Função de play/pause
+    function togglePlay(button, audioId) {
+      const audioElement = document.getElementById(`audio-${audioId}`);
+      const loadingEl = document.getElementById(`loading-${audioId}`);
+      const playBtn = button;
+
+      // Pausar outro áudio
+      if (currentAudio && currentAudio !== audioElement) {
+        currentAudio.pause();
+        const prevBtn = document.querySelector(`.play-btn[data-audio="${currentAudio.id.split('-')[1]}"]`);
+        if (prevBtn) prevBtn.innerHTML = '▶';
+      }
+
+      // Primeiro clique: carrega o áudio
+      if (!audioElement.src) {
+        const filename = audioElement.dataset.filename;
+        audioElement.src = `/static/audio/catequese/${encodeURIComponent(filename)}`;
+        loadingEl.style.display = 'inline';
+        setupAudioPlayer(audioId); // Configura eventos
+      }
+
+      // Toca ou pausa
+      if (audioElement.paused) {
+        audioElement.play()
+          .then(() => {
+            playBtn.innerHTML = '❚❚';
+            currentAudio = audioElement;
+            loadingEl.style.display = 'none';
+          })
+          .catch(err => {
+            console.error("Erro ao reproduzir:", err);
+            alert("Falha ao reproduzir o áudio.");
+            loadingEl.style.display = 'none';
+          });
+      } else {
+        audioElement.pause();
+        playBtn.innerHTML = '▶';
+        if (currentAudio === audioElement) currentAudio = null;
+      }
+    }
+
+    // Inicializa todos os botões
+    document.querySelectorAll('.play-btn').forEach(button => {
+      const audioId = button.dataset.audio;
+      button.onclick = () => togglePlay(button, audioId);
+    });
+
+    // Alternar resumo
+    function toggleResumo(button) {
+      const resumo = button.nextElementSibling;
+      if (resumo.style.display === 'none' || !resumo.style.display) {
+        resumo.style.display = 'block';
+        button.innerHTML = '❌ Ocultar Resumo';
+      } else {
+        resumo.style.display = 'none';
+        button.innerHTML = '📜 Mostrar Resumo';
+      }
+    }
+  </script>
+
+  <footer>
+    &copy; {{ ano }} Portal de Catequese.<br>
+    <em>"Ide e ensinai todas as nações, batizando-as..." — Mateus 28,19</em>
+  </footer>
+
+</body>
+</html>
