@@ -1,0 +1,3822 @@
+################################################################################
+### ARQUIVO: app.py
+################################################################################
+
+import requests
+from flask import Flask, render_template, Response, send_file, request
+from functools import lru_cache
+import os
+import re
+import subprocess
+from io import BytesIO
+from weasyprint import HTML
+from datetime import datetime
+
+# Executa o extrator em segundo plano
+process = subprocess.Popen(
+    ["python3", "static/text/extrator_links.py"],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL
+)
+print("Extrator iniciado em segundo plano.")
+
+app = Flask(__name__)
+
+# Caminho para o arquivo de links
+LINKS_FILE = os.path.join(app.static_folder, 'text', 'salmos_links.txt')
+
+# === 1. Defina formatar_nome_salmo ANTES de carregar_salmos ===
+def formatar_nome_salmo(filename):
+    # Remove extensão
+    nome = re.sub(r'\.(mp3|doc)$', '', filename, flags=re.IGNORECASE)
+    # Remove '_playback'
+    nome = re.sub(r'_playback$', '', nome, flags=re.IGNORECASE)
+    # Normaliza múltiplos underscores
+    nome = re.sub(r'_+', '_', nome).strip('_')
+
+    # Casos especiais
+    if 'dn_' in nome:
+        return "Daniel 3"
+    if 'isaias12' in nome or 'isaías12' in nome:
+        return "Responsório de Isaías 12"
+    if 'responsorio' in nome:
+        return "Responsório"
+    if 'vigilia' in nome or 'vigiliapascal' in nome:
+        return "Vigília Pascal"
+
+    # Padrão: salmo_X ou salmo_X_Y
+    match = re.match(r'^salmo_(\d+)(?:_(\w+))?$', nome, re.IGNORECASE)
+    if match:
+        numero = match.group(1)
+        sufixo = match.group(2) or ''
+        if sufixo.isdigit():
+            return f"Salmo {numero} — Versão {sufixo}"
+        elif sufixo and re.match(r'^[a-d]$', sufixo, re.IGNORECASE):
+            versao = ord(sufixo.lower()) - ord('a') + 1
+            return f"Salmo {numero} — Versão {versao}"
+        else:
+            return f"Salmo {numero}"
+    return nome.replace('_', ' ').title()
+
+# === 2. Defina chave_ordenacao (opcional, pode ser inline) ===
+def chave_ordenacao(salmo):
+    nome = salmo['nome']
+    
+    # Ordem: Daniel 3 → Isaías 12 → Vigília Pascal → Salmos por número
+    if 'Daniel 3' in nome:
+        return (1, 0, 0)
+    if 'Isaias12' in nome or 'Isaías 12' in nome or 'Responsório de Isaías 12' in nome:
+        return (2, 0, 0)
+    if 'Vigília Pascal' in nome:
+        return (3, 0, 0)
+    
+    # Extrai número do salmo e versão
+    match = re.match(r'Salmo (\d+)(?:[ _\-]?(.+))?', nome)
+    if match:
+        numero = int(match.group(1))
+        sufixo = match.group(2) or '0'
+        versao_match = re.search(r'(\d+)', sufixo)
+        versao = int(versao_match.group(1)) if versao_match else 0
+        return (10, numero, versao)
+    
+    return (99, nome.lower())
+
+# === 3. Agora defina carregar_salmos ===
+def carregar_salmos():
+    if not os.path.exists(LINKS_FILE):
+        return []
+
+    with open(LINKS_FILE, 'r', encoding='utf-8') as f:
+        linhas = [linha.strip() for linha in f if linha.strip()]
+
+    mp3_urls = []
+    doc_urls = []
+    secao = None
+
+    for linha in linhas:
+        if linha.startswith('## Links MP3:'):
+            secao = 'mp3'
+            continue
+        elif linha.startswith('## Links DOC (Cifras):'):
+            secao = 'doc'
+            continue
+        if secao == 'mp3' and linha.endswith('.mp3'):
+            mp3_urls.append(linha)
+        elif secao == 'doc' and linha.endswith('.doc'):
+            doc_urls.append(linha)
+
+    mp3_dict = {url.split('/')[-1]: url for url in mp3_urls}
+    doc_dict = {url.split('/')[-1].replace('.doc', '.mp3'): url for url in doc_urls}
+
+    salmos = []
+    for filename, mp3_url in mp3_dict.items():
+        doc_url = doc_dict.get(filename, "#")
+        nome = filename.rsplit('.', 1)[0]  # mantém nome original
+        salmos.append({
+            'filename': filename,
+            'nome': nome,
+            'mp3_url': mp3_url,
+            'doc_url': doc_url
+        })
+
+    # Ordena por nome (opcional)
+    return sorted(salmos, key=lambda x: x['nome'])
+
+# === 4. Carregue os salmos (depois de tudo definido) ===
+SALMOS = carregar_salmos()
+
+# === 5. Rotas do Flask ===
+@app.route('/salmos')
+def pagina_salmos():
+    return render_template('salmos.html', salmos=SALMOS, ano=2025)
+
+# 🔊 Rota: Stream do áudio (sem expor URL)
+@app.route('/play/<path:filename>')
+def play_salmo(filename):
+    from urllib.parse import unquote
+    filename = unquote(filename)
+    salmo = next((s for s in SALMOS if s['filename'] == filename), None)
+    if not salmo:
+        return "Salmos não encontrado", 404
+    def generate():
+        with requests.get(salmo['mp3_url'], stream=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(1024):
+                yield chunk
+    return Response(generate(), mimetype="audio/mpeg")
+
+# ⬇️ Rota: Download anônimo (via wget em memória)
+@app.route('/download/mp3/<path:filename>')
+def download_mp3(filename):
+    from urllib.parse import unquote
+    filename = unquote(filename)
+    salmo = next((s for s in SALMOS if s['filename'] == filename), None)
+    if not salmo:
+        return "Salmos não encontrado", 404
+    
+
+    def generate():
+        process = subprocess.Popen(
+            ['wget', '-q', '-O-', salmo['mp3_url']],
+            stdout=subprocess.PIPE
+        )
+        for chunk in iter(lambda: process.stdout.read(1024), b""):
+            yield chunk
+        process.wait()
+
+    return Response(
+        generate(),
+        mimetype='audio/mpeg',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
+
+
+@app.route('/download/doc/<path:filename>')
+def download_doc(filename):
+    from urllib.parse import unquote
+    filename = unquote(filename)
+    doc_filename = filename.replace('.mp3', '.doc')
+    salmo = next((s for s in SALMOS if s['filename'].replace('.mp3', '.doc') == doc_filename), None)
+    if not salmo or salmo['doc_url'] == "#":
+        return "Cifra não disponível", 404
+
+    def generate():
+        with requests.get(salmo['doc_url'], stream=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=1024):
+                yield chunk
+
+    return Response(
+        generate(),
+        mimetype='application/vnd.ms-word',
+        headers={'Content-Disposition': f'attachment; filename="{doc_filename}"'}
+    )
+
+
+pecados = {
+    "1. Amar a Deus sobre todas as coisas": [
+        "Negligenciei minha oração diária",
+        "Tive dúvidas sobre a fé e critiquei os ensinamentos da Igreja",
+        "Senti desânimo espiritual e me revoltei contra Deus",
+        "Frequentei cultos ou práticas supersticiosas (ex: cartomantes, horóscopos)",
+        "Busquei minha própria glória em vez da vontade de Deus",
+        "Fui orgulhoso, vaidoso ou apegado a elogios",
+        "Apeguei-me excessivamente ao dinheiro e aos bens materiais",
+        "Fui impaciente e pouco tolerante com os outros",
+        "Fui indiferente diante do sofrimento alheio",
+        "Faltou-me empatia e amor ao próximo",
+        "Levei outros ao pecado com meus conselhos, atitudes ou exemplos",
+        "Ignorei oportunidades de praticar caridade"
+    ],
+    "2. Não tomar o nome de Deus em vão": [
+        "Usei o nome de Deus ou dos santos de forma desrespeitosa",
+        "Ridicularizei símbolos da fé ou religiosos",
+        "Fiz promessas sem intenção de cumprir",
+        "Fiz juramentos falsos ou desnecessários",
+        "Permiti ou ri quando outros zombaram da fé",
+        "Usei expressões religiosas com banalidade ou em vão"
+    ],
+    "3. Guardar domingos e festas de guarda": [
+        "Faltei à missa dominical ou em dias santos sem necessidade grave",
+        "Cheguei intencionalmente atrasado à missa ou saí antes da bênção final",
+        "Comunguei estando em pecado mortal",
+        "Deixei de me confessar ao menos uma vez ao ano",
+        "Não jejuei ou não fiz abstinência quando mandado pela Igreja",
+        "Negligenciei a ajuda material à Igreja",
+        "Fui à missa por obrigação, sem esforço de viver a fé no dia a dia"
+    ],
+    "4. Honrar pai e mãe": [
+        "Desobedeci e faltei com respeito aos meus pais ou superiores",
+        "Negligenciei os cuidados com meus pais idosos ou doentes",
+        "Maltratei meu cônjuge com palavras ou atitudes",
+        "Dei mau exemplo aos meus filhos",
+        "Permiti influências negativas sobre meus filhos (TV, internet, amizades)",
+        "Fui negligente na formação religiosa dos meus filhos",
+        "Deixei de corrigir meus filhos por comodismo",
+        "Fui ingrato com meus pais ou avós"
+    ],
+    "5. Não matar": [
+        "Alimentei ódio, rancor, inimizade ou desejo de vingança",
+        "Recusei-me a perdoar",
+        "Desejei a morte ou o mal a alguém (ou a mim mesmo)",
+        "Apoiei ou pratiquei aborto, eutanásia ou outras práticas semelhantes",
+        "Fui descuidado com minha saúde (excesso de comida, drogas, bebida, sedentarismo)",
+        "Assumi riscos desnecessários à minha vida (direção imprudente, vícios)",
+        "Dei escândalo ou mau exemplo",
+        "Proferi palavrões ou palavras agressivas contra os outros",
+        "Feri emocionalmente alguém com minhas palavras ou atitudes",
+        "Fui violento, mesmo verbalmente, com pessoas próximas"
+    ],
+    "6. Não pecar contra a castidade": [
+        "Consenti em pensamentos ou desejos impuros",
+        "Me masturbei, assisti pornografia ou tive relações sexuais fora do casamento",
+        "Fui infiel emocionalmente ou fisicamente",
+        "Tive liberdades excessivas no namoro",
+        "Usei roupas provocativas com má intenção",
+        "Participei de conversas ou fiz piadas imorais",
+        "Consumi conteúdo sexualizado (TV, filmes, redes sociais)",
+        "Mantive amizades que me levaram ao pecado",
+        "Fiz comentários maliciosos sobre o corpo de outras pessoas",
+        "Alimentei fantasias sexuais intencionalmente"
+    ],
+    "7. Não roubar": [
+        "Roubei ou fui desonesto em contratos ou negócios",
+        "Me apropriei de bens ou dinheiro indevidamente",
+        "Deixei de pagar dívidas justas ou salários devidos",
+        "Desperdicei tempo no trabalho ou trabalhei com negligência",
+        "Fui viciado em jogos de azar",
+        "Vivi acima dos meus meios",
+        "Fui injusto ao cobrar ou receber valores excessivos",
+        "Usei benefícios ou ajudas indevidamente"
+    ],
+    "8. Não levantar falso testemunho": [
+        "Menti habitualmente, mesmo sem prejudicar diretamente",
+        "Caluniei, difamei ou exagerei defeitos dos outros",
+        "Ouvi ou espalhei boatos",
+        "Julguei mal ou condenei injustamente alguém",
+        "Causei divisão entre pessoas por fofoca",
+        "Não reparei a má reputação causada por mim",
+        "Fui hipócrita ou dissimulado para parecer melhor"
+    ],
+    "9. Não desejar a mulher do próximo": [
+        "Alimentei desejos impuros por pessoas casadas ou consagradas",
+        "Tive fantasias ou intenções de infidelidade",
+        "Assediei verbal ou fisicamente",
+        "Flertei com pessoas comprometidas",
+        "Tive curiosidade indevida sobre a intimidade de outras pessoas",
+        "Usei o olhar de maneira impura ou desrespeitosa"
+    ],
+    "10. Não cobiçar as coisas alheias": [
+        "Invejei os bens, o sucesso ou os talentos dos outros",
+        "Desejei tomar ou imitar aquilo que pertence a outros",
+        "Fiquei descontente com a minha vida por causa de comparações",
+        "Fui ambicioso em excesso, sem gratidão pelo que tenho",
+        "Desejei viver a vida dos outros em vez de valorizar a minha"
+    ],
+    "Mandamentos da Igreja": [
+        "Faltei à Missa em festas de guarda",
+        "Não me confessei ao menos uma vez por ano",
+        "Não comunguei na Páscoa",
+        "Comunguei em pecado grave",
+        "Não guardei jejum e abstinência nos tempos prescritos",
+        "Não ajudei a Igreja materialmente",
+        "Desprezei os sacramentos por comodismo ou frieza espiritual"
+    ],
+    "Pecados relacionados ao casamento e à família": [
+        "Fui negligente com meu cônjuge (no diálogo, carinho ou atenção)",
+        "Fui violento física ou verbalmente dentro do lar",
+        "Desrespeitei meu cônjuge",
+        "Guardei mágoas e não perdoei no matrimônio",
+        "Priorizei trabalho ou lazer em detrimento da família",
+        "Recusei-me a ter filhos sem justa causa",
+        "Não dei testemunho cristão dentro do lar",
+        "Fui indiferente à vida familiar ou às necessidades dos meus",
+        "Usei palavras ofensivas ou humilhantes com meus familiares"
+    ],
+    "Pecados espirituais e morais": [
+        "Fui preguiçoso espiritualmente (não busquei crescer na fé)",
+        "Me desinteressei pelas coisas de Deus",
+        "Fui indiferente no zelo apostólico (não evangelizei, nem ajudei outros na fé)",
+        "Fui conivente com o pecado, meu ou alheio",
+        "Busquei o sucesso pessoal acima da vontade divina",
+        "Agi por egoísmo, pensando apenas em mim",
+        "Fui omisso diante de injustiças ou sofrimentos ao meu redor"
+    ],
+        "Pecados veniais (faltas leves que enfraquecem minha alma, mas não rompem a amizade com Deus)": [
+        "Falei palavras impacientes, com leve irritação ou impolidez",
+        "Fui negligente em atos de caridade com os mais próximos",
+        "Fiz piadas ou comentários inapropriados, sem intenção grave",
+        "Julguei os outros interiormente, mesmo sem espalhar críticas",
+        "Tive distrações voluntárias durante a oração, sem esforço para me recolher",
+        "Faltei com pequenas responsabilidades no trabalho ou estudo por descuido",
+        "Deixei de ajudar alguém por comodismo, ainda que pudesse fazê-lo",
+        "Busquei meu conforto ou prazer em coisas pequenas, sem moderação",
+        "Fui impaciente com pessoas mais lentas ou com ideias diferentes das minhas",
+        "Usei meu tempo de forma egoísta, deixando de servir mais ao próximo"
+    ],
+    
+    "Pecados capitais (raízes do pecado que geram muitas outras faltas)": [
+        "Cedi à soberba, agindo com orgulho ou querendo ser superior aos outros",
+        "Fui avarento, apegado ao dinheiro ou a bens materiais, sem generosidade",
+        "Entreguei-me à luxúria, buscando prazeres impuros nos pensamentos, olhares ou ações",
+        "Fui invejoso, entristecendo-me com o bem ou sucesso alheio",
+        "Alimentei a gula, comendo ou bebendo além do necessário por puro prazer",
+        "Fui irado, permitindo que a raiva dominasse minhas palavras ou atitudes",
+        "Fui preguiçoso, negligente no cumprimento dos meus deveres espirituais ou materiais"
+    ]
+
+}
+
+
+# ✅ Rota principal
+@app.route("/", methods=["GET", "POST"])
+def index():
+    resultado = {}
+    html_conteudo = ""
+    if request.method == "POST":
+        for mandamento, lista in pecados.items():
+            indices = request.form.getlist(mandamento)
+            selecionados = [lista[int(i)] for i in indices if i.isdigit() and int(i) < len(lista)]
+            if selecionados:
+                resultado[mandamento] = selecionados
+
+        custom = request.form.get("custom", "").strip()
+        if custom:
+            resultado.setdefault("Outros pecados digitados", []).append(custom)
+
+        html_conteudo = render_template("pdf_template.html", resultado=resultado)
+
+    return render_template("index.html", pecados=pecados, resultado=resultado, html_conteudo=html_conteudo)
+
+# ✅ Rota de download do PDF
+@app.route("/download", methods=["POST"])
+def download():
+    html_renderizado = request.form.get("html_conteudo", "")
+    if not html_renderizado:
+        return "Conteúdo vazio para gerar PDF", 400
+
+    pdf_io = BytesIO()
+    html = HTML(string=html_renderizado, base_url=request.base_url)
+    html.write_pdf(target=pdf_io)
+    pdf_io.seek(0)
+
+    return Response(pdf_io.read(),
+                    mimetype="application/pdf",
+                    headers={"Content-Disposition": "attachment;filename=meus_pecados.pdf"})
+
+# ✅ Rota de orações
+@app.route("/oracoes")
+def oracoes():
+    oracoes_lista = [
+        {
+            "id": 1,
+            "titulo": "Ato de Contrição",
+            "texto": (
+                "Meu Deus, arrependo-me de todo o coração de Vos ter ofendido, "
+                "porque sois infinitamente bom e digno de ser amado sobre todas as coisas. "
+                "Proponho firmemente, com o auxílio da vossa graça, emendar-me e evitar as ocasiões de pecado. "
+                "Senhor, pela paixão de Jesus Cristo, tende piedade de mim. Amém."
+            ),
+            "descricao": "Expressa arrependimento sincero e desejo de mudança."
+        },
+        {
+            "id": 2,
+            "titulo": "Oração do Arrependimento",
+            "texto": (
+                "Meu Jesus, por serdes tão bom, e por me amardes tanto, vos agradeço por me terdes esperado até agora e não terdes permitido que eu morresse em pecado. "
+                "Peço-vos, por vossa paixão e morte na cruz, perdoai-me todos os meus pecados e fazei-me verdadeiramente penitente..."
+            ),
+            "descricao": "Para momentos de reflexão e conversão interior."
+        },
+        {
+            "id": 3,
+            "titulo": "Confissão Geral",
+            "texto": (
+                "Senhor meu Deus, reconheço diante de Vós que pequei muitas vezes por pensamentos, palavras, atos e omissões. "
+                "Arrependo-me sinceramente de todas as minhas faltas e ofensas, especialmente daquelas que mais feriram o vosso amor. "
+                "Com humildade, suplico a vossa misericórdia e, como o filho pródigo, digo: Pai, pequei contra o Céu e contra Vós. "
+                "Não sou digno de ser chamado vosso filho. Tende piedade de mim, Senhor. Amém."
+            ),
+            "descricao": "Ideal para preparação antes da confissão sacramental."
+        },
+        {
+            "id": 4,
+            "titulo": "Miserere Mei Deus",
+            "texto": (
+                "Tende piedade de mim, ó Deus, segundo a vossa misericórdia; "
+                "segundo a grandeza da vossa compaixão, apagai a minha culpa. "
+                "Lavai-me totalmente da minha iniquidade, e purificai-me do meu pecado. "
+                "Criai em mim, ó Deus, um coração puro e renovai em meu peito um espírito firme."
+            ),
+            "descricao": "Um dos salmos penitenciais mais conhecidos da tradição cristã."
+        },
+        {
+            "id": 5,
+            "titulo": "Do Profundo",
+            "texto": (
+                "Das profundezas clamo a Vós, Senhor. Senhor, escutai a minha voz! "
+                "Estejam atentos os vossos ouvidos às súplicas da minha prece. "
+                "Se levardes em conta nossas faltas, Senhor, quem poderá subsistir? "
+                "Mas em Vós se encontra o perdão, e por isso Vos teme com reverência."
+            ),
+            "descricao": "Uma poderosa expressão de esperança na misericórdia divina."
+        },
+        {
+            "id": 6,
+            "titulo": "Salmo 6",
+            "texto": (
+                "Senhor, não me repreendais em vossa ira, nem me castigueis no vosso furor. "
+                "Tende piedade de mim, Senhor, pois desfaleço; curai-me, Senhor, pois meus ossos tremem. "
+                "A minha alma está profundamente perturbada... Salvai-me por causa da vossa misericórdia!"
+            ),
+            "descricao": "Suplica o perdão e a cura espiritual e física."
+        },
+        {
+            "id": 7,
+            "titulo": "Oração à Virgem Maria",
+            "texto": (
+                "Ó Maria Santíssima, Mãe de Deus e minha Mãe, refugio-me sob a vossa proteção maternal. "
+                "Vós que sois a Medianeira de todas as graças, intercedei por mim junto a vosso Filho Jesus. "
+                "Alcançai-me a graça do verdadeiro arrependimento, uma boa confissão e a perseverança no bem. "
+                "Acompanhai-me em todos os momentos da vida, sobretudo na hora da morte. Amém."
+            ),
+            "descricao": "Peça a intercessão de Nossa Senhora após o exame de consciência."
+        }
+    ]
+    return render_template("oracoes.html", oracoes=oracoes_lista)
+
+
+# ✅ Rota da Liturgia do Dia
+@app.route("/liturgia")
+def liturgia():
+    # Dados de fallback (usados se a API falhar)
+    FALLBACK_LITURGIA = {
+        "data": "16/07/2025",
+        "liturgia": "Bem-aventurada Virgem Maria do Monte Carmelo, Festa",
+        "cor": "Branco",
+        "dia": "Senhor, nós vos pedimos: venha em nosso auxílio a venerável intercessão da gloriosa Virgem Maria...",
+        "oferendas": "Acolhei, Senhor, as orações e oferendas dos vossos fiéis...",
+        "comunhao": "Senhor, vós nos fizestes participantes dos frutos da redenção eterna...",
+        "primeiraLeitura": {
+            "referencia": "Zc 2, 14-17",
+            "titulo": "Leitura da Profecia de Zacarias",
+            "texto": "14“Rejubila, alegra-te, cidade de Sião..."
+        },
+        "segundaLeitura": "Não há segunda leitura hoje!",
+        "salmo": {
+            "referencia": "Lc 1, 46-55",
+            "refrao": "O Poderoso fez por mim maravilhas, e Santo é o seu nome.",
+            "texto": "— A minh’alma engrandece ao Senhor..."
+        },
+        "evangelho": {
+            "referencia": "Mt 12, 46-50",
+            "titulo": "Proclamação do Evangelho de Jesus Cristo ✠ segundo Mateus",
+            "texto": "Naquele tempo, 46enquanto Jesus estava falando às multidões..."
+        },
+        "antifonas": {
+            "entrada": "Todos vós que a Deus temeis, vinde escutar...",
+            "comunhao": "Desde agora as gerações hão de chamar me de bendita..."
+        }
+    }
+
+    # Função auxiliar para extrair texto dos campos
+    def extrair_texto(obj):
+        if isinstance(obj, dict):
+            return {
+                "titulo": obj.get("titulo", ""),
+                "texto": obj.get("texto", "Texto não disponível"),
+                "referencia": obj.get("referencia", "Sem referência"),
+                "refrao": obj.get("refrao", "")
+            }
+        return {
+            "titulo": "",
+            "texto": obj or "Texto não disponível",
+            "referencia": "Sem referência",
+            "refrao": ""
+        }
+
+    # Tenta buscar da API
+    try:
+        response = requests.get("https://liturgia.up.railway.app/", timeout=10)
+        response.raise_for_status()
+        dados_api = response.json()
+    except Exception as e:
+        print(f"[AVISO] API de liturgia falhou: {e}. Usando fallback.")
+        dados_api = FALLBACK_LITURGIA
+
+    # Processa a data
+    try:
+        data_obj = datetime.strptime(dados_api.get("data", ""), "%d/%m/%Y")
+        data_iso = data_obj.strftime("%Y-%m-%d")
+    except:
+        data_iso = datetime.now().strftime("%Y-%m-%d")
+
+    
+    # Extrai o salmo do dia
+    salmo_api = dados_api.get("salmo", {})
+    titulo_salmo = salmo_api.get("referencia", "").strip()
+    salmos_do_dia = []  # Agora é uma lista!
+
+    if titulo_salmo:
+        # Função auxiliar: busca por padrão
+        def corresponde(filename_lower, padrao):
+            return re.search(padrao, filename_lower)
+
+        # Caso 1: Magnificat (Lc 1, 46-55) → todos os salmo_102_*.mp3
+        if "Lc 1, 46" in titulo_salmo or "Maria" in titulo_salmo:
+            for s in SALMOS:
+                if "salmo_102" in s['filename'].lower():
+                    salmos_do_dia.append(s)
+
+        # Caso 2: Dn 3 → dn_3.mp3
+        elif "Dn 3" in titulo_salmo:
+            for s in SALMOS:
+                if "dn_3.mp3" == s['filename'].lower():
+                    salmos_do_dia.append(s)
+                    break  # Só tem um
+
+        # Caso 3: Is 12 → isaias12.mp3
+        elif "Is 12" in titulo_salmo:
+            for s in SALMOS:
+                if "isaias12.mp3" == s['filename'].lower():
+                    salmos_do_dia.append(s)
+                    break  # Só tem um
+
+        # Caso 4: Salmo comum numerado (ex: Salmo 23, Salmo 117)
+        elif match := re.search(r'\bSalmo\s+(\d+)', titulo_salmo, re.IGNORECASE):
+            numero = match.group(1)
+            padrao = f"salmo_{numero}_[^p]"  # Qualquer versão que não seja _playback
+            for s in SALMOS:
+                fname = s['filename'].lower()
+                if f"salmo_{numero}" in fname and "playback" not in fname:
+                    salmos_do_dia.append(s)
+            # Se não achou nenhuma sem playback, pega todas
+            if not salmos_do_dia:
+                for s in SALMOS:
+                    if f"salmo_{numero}" in s['filename'].lower():
+                        salmos_do_dia.append(s)
+
+        # Ordena por nome (ex: salmo_117_2 antes de salmo_117_9)
+        salmos_do_dia.sort(key=lambda x: x['filename'])
+
+    # Prepara os dados para o template
+    dados = {
+        "data": dados_api.get("data"),
+        "titulo": dados_api.get("liturgia", "Liturgia do Dia"),
+        "cor": dados_api.get("cor", "Cor não informada"),
+        "dia": dados_api.get("dia", ""),
+        "oferendas": dados_api.get("oferendas", ""),
+        "comunhao": dados_api.get("comunhao", ""),
+        "segundaLeitura": dados_api.get("segundaLeitura", ""),
+        "antifonas": dados_api.get("antifonas", {}),
+        "primeiraLeitura": extrair_texto(dados_api.get("primeiraLeitura")),
+        "salmo": extrair_texto(salmo_api),
+        "evangelho": extrair_texto(dados_api.get("evangelho")),
+        "salmos_do_dia": salmos_do_dia  # ✅ Agora é uma lista
+    }
+
+    # ✅ RETORNO VÁLIDO
+    return render_template("liturgia.html", **dados)
+
+
+@app.route("/terco")
+def terco():
+    mistérios = {
+        "Gozosos": [
+            "1. A Anunciação do Anjo a Maria",
+            "2. A Visitação de Maria a Isabel",
+            "3. O Nascimento de Jesus em Belém",
+            "4. A Apresentação do Menino Jesus no Templo",
+            "5. O Encontro do Menino Jesus no Templo"
+        ],
+        "Dolorosos": [
+            "1. Jesus agoniza no Horto",
+            "2. Jesus é açoitado",
+            "3. Jesus é coroado de espinhos",
+            "4. Jesus carrega a Cruz",
+            "5. Jesus é crucificado"
+        ],
+        "Gloriosos": [
+            "1. Ressurreição de Jesus",
+            "2. Ascensão de Jesus",
+            "3. Descida do Espírito Santo",
+            "4. Assunção de Maria",
+            "5. Coroação de Maria"
+        ],
+        "Luminosos": [
+            "1. Batismo de Jesus no Jordão",
+            "2. Auto-revelação de Jesus em Caná",
+            "3. Anúncio do Reino de Deus",
+            "4. Transfiguração de Jesus",
+            "5. Instituição da Eucaristia"
+        ]
+    }
+
+    oracoes = {
+        "Sinal da Cruz": "Em nome do Pai, e do Filho e do Espírito Santo. Amém.",
+        "Oferecimento": "Divino Jesus, nós vos oferecemos este terço que vamos rezar, meditando nos mistérios da nossa redenção. Concedei-nos, pela intercessão da Virgem Maria, Mãe de Deus e nossa Mãe, as virtudes que nos são necessárias para bem rezá-lo e a graça de ganharmos as indulgências desta santa devoção.",
+        "Oração do Anjo": "O Anjo do Senhor anunciou a Maria. E ela concebeu do Espírito Santo. Ave Maria... Eis aqui a serva do Senhor. Faça-se em mim segundo a Vossa palavra. Ave Maria... E o Verbo de Deus se fez carne. E habitou entre nós. Ave Maria... Rogai por nós, Santa Mãe de Deus. Para que sejamos dignos das promessas de Cristo.",
+        "Credo": "Creio em Deus Pai todo-poderoso, criador do céu e da terra... (completo)",
+        "Mistérios": {
+            "Segunda": "Gozosos",
+            "Terça": "Dolorosos",
+            "Quarta": "Gloriosos",
+            "Quinta": "Luminosos",
+            "Sexta": "Dolorosos",
+            "Sábado": "Gozosos",
+            "Domingo": "Gloriosos"
+        },
+        "Final": {
+            "Salve": "Salve, Rainha, Mãe de misericórdia, vida, doçura e esperança nossa, salve! A vós bradamos, os degredados filhos de Eva...",
+            "Ladainha": "Senhor, tende piedade de nós... Cristo, tende piedade de nós... Senhor, tende piedade de nós..."
+        }
+    }
+
+    return render_template("terco.html", mistérios=mistérios, oracoes=oracoes)
+
+
+# ✅ Execução da aplicação
+@app.context_processor
+def utility_processor():
+    return dict(formatar_nome_salmo=formatar_nome_salmo)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
+
+################################################################################
+### ARQUIVO: compilar_projeto.py
+################################################################################
+
+import os
+
+# Lista inicial de arquivos principais
+arquivos = [
+    "app.py",
+    "compilar_projeto.py",
+    "Dockerfile",
+    "README.md",
+    "render.yaml",
+    "requirements.txt"
+]
+
+# Função para adicionar todos os arquivos de uma pasta (recursivamente)
+def adicionar_arquivos_de_pasta(pasta, extensoes=None):
+    caminhos = []
+    for raiz, _, arquivos_local in os.walk(pasta):
+        for nome in arquivos_local:
+            caminho_completo = os.path.join(raiz, nome)
+            if extensoes:
+                if any(nome.endswith(ext) for ext in extensoes):
+                    caminhos.append(caminho_completo)
+            else:
+                caminhos.append(caminho_completo)
+    return caminhos
+
+# Adiciona arquivos das pastas estáticas e templates
+arquivos += adicionar_arquivos_de_pasta("static/audio", extensoes=[".py", ".mp3"])
+arquivos += adicionar_arquivos_de_pasta("static/css", extensoes=[".css"])
+arquivos += adicionar_arquivos_de_pasta("static/img", extensoes=[".jpg", ".png"])
+arquivos += adicionar_arquivos_de_pasta("static/text", extensoes=[".py", ".mp3", ".txt"])
+arquivos += adicionar_arquivos_de_pasta("templates", extensoes=[".html"])
+
+# Nome do arquivo final de saída
+saida = "projeto_compilado.txt"
+
+# Criar o arquivo final com todos os códigos
+with open(saida, "w", encoding="utf-8") as f_out:
+    for caminho in arquivos:
+        if os.path.exists(caminho):
+            f_out.write(f"{'#' * 80}\n")
+            f_out.write(f"### ARQUIVO: {caminho}\n")
+            f_out.write(f"{'#' * 80}\n\n")
+            try:
+                # Tenta abrir como texto
+                with open(caminho, "r", encoding="utf-8") as f_in:
+                    f_out.write(f_in.read())
+            except Exception as e:
+                # Se não for arquivo de texto (ex: mp3), apenas registra o nome
+                f_out.write(f"# Arquivo binário ou não legível como texto: {caminho}\n")
+            f_out.write("\n\n")
+        else:
+            f_out.write(f"# Arquivo não encontrado: {caminho}\n\n")
+
+print(f"\n✅ Arquivo '{saida}' criado com sucesso.")
+
+
+################################################################################
+### ARQUIVO: Dockerfile
+################################################################################
+
+# Usa imagem base leve com Python 3.11
+FROM python:3.11-slim
+
+# Instala dependências do sistema necessárias
+# - Para WeasyPrint (geração de PDF)
+# - Para wget (download anônimo de MP3)
+# - Para BeautifulSoup (parser HTML)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libcairo2 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    libssl-dev \
+    shared-mime-info \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    fonts-dejavu \
+    fontconfig \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia os arquivos do projeto para o container
+COPY . .
+
+# Instala as dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expõe a porta padrão do Render
+EXPOSE 10000
+
+# Comando para iniciar o app com gunicorn
+# Primeiro roda o extrator, depois inicia o servidor
+CMD ["sh", "-c", "python static/text/extrator_links.py && gunicorn --bind 0.0.0.0:10000 app:app"]
+
+################################################################################
+### ARQUIVO: README.md
+################################################################################
+
+# confission
+
+################################################################################
+### ARQUIVO: render.yaml
+################################################################################
+
+services:
+  - type: web
+    name: confission
+    env: docker
+    dockerfilePath: ./Dockerfile
+    buildCommand: echo "Usando Dockerfile"
+    startCommand: echo "Usando CMD do Dockerfile"
+    port: 10000
+
+################################################################################
+### ARQUIVO: requirements.txt
+################################################################################
+
+Flask==2.3.3
+WeasyPrint==53.0
+gunicorn
+requests
+beautifulsoup4==4.12.3
+lxml==5.2.1
+
+
+################################################################################
+### ARQUIVO: static/audio/miserere_mei_deus.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/audio/miserere_mei_deus.mp3
+
+
+################################################################################
+### ARQUIVO: static/audio/baixar/baixar-mp3.py
+################################################################################
+
+from pytube import YouTube
+from moviepy.editor import AudioFileClip
+import os
+
+def baixar_mp3(link):
+    try:
+        yt = YouTube(link)
+        print(f"Baixando: {yt.title}")
+
+        audio_stream = yt.streams.filter(only_audio=True).first()
+        arquivo_temp = audio_stream.download(filename="temp_audio.mp4")
+
+        nome_arquivo_mp3 = yt.title.replace(" ", "_").replace("/", "_") + ".mp3"
+        clip = AudioFileClip(arquivo_temp)
+        clip.write_audiofile(nome_arquivo_mp3)
+
+        clip.close()
+        os.remove(arquivo_temp)
+
+        print(f"Download completo: {nome_arquivo_mp3}")
+    except Exception as e:
+        print(f"Erro ao baixar: {e}")
+
+# 🟢 Pergunta o link
+if __name__ == "__main__":
+    link = input("Cole o link do vídeo do YouTube: ").strip()
+    baixar_mp3(link)
+
+
+################################################################################
+### ARQUIVO: static/audio/terco/dor.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/audio/terco/dor.mp3
+
+
+################################################################################
+### ARQUIVO: static/audio/terco/lum.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/audio/terco/lum.mp3
+
+
+################################################################################
+### ARQUIVO: static/audio/terco/goz.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/audio/terco/goz.mp3
+
+
+################################################################################
+### ARQUIVO: static/audio/terco/glo.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/audio/terco/glo.mp3
+
+
+################################################################################
+### ARQUIVO: static/css/style.css
+################################################################################
+
+/* Estilo base da página */
+body.page-body {
+  font-family: Georgia, serif;
+  padding: 40px;
+  color: #333;
+  background-color: #fffef8;
+}
+
+/* Título principal */
+h1.title {
+  text-align: center;
+  color: #6a4f28;
+  margin-bottom: 30px;
+}
+
+/* Títulos de seções como "1. Amar a Deus sobre todas as coisas" */
+.section-title {
+  color: #4a3820;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+/* Card de mandamentos - com linha dourada à esquerda */
+.card-section {
+  border-left: 5px solid #d4af37; /* Linha dourada à esquerda */
+  background-color: #fffef8;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Estilização do texto dentro dos cards */
+.card-section h3 {
+  color: #4a3820;
+  font-weight: bold;
+}
+
+/* Lista de pecados */
+.list-group-item {
+  border: none;
+  color: #333;
+  padding-left: 0;
+}
+
+.list-group-flush .list-group-item {
+  border-width: 0;
+}
+
+/* Ícone centralizado */
+.icon {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.icon img {
+  width: 120px;
+  border-radius: 10px;
+  border: 3px solid #d4af37;
+}
+
+/* Botões */
+button.btn {
+  padding: 10px 20px;
+  background-color: #d4af37;
+  border: none;
+  border-radius: 6px;
+  color: #4a3820;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button.btn:hover {
+  background-color: #b38c1a;
+  color: white;
+}
+
+/* Área de digitação de pecados personalizados */
+textarea.form-control {
+  border: 2px solid #d4af37;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: Georgia, serif;
+  color: #4a3820;
+  resize: vertical;
+}
+
+/* Player de áudio */
+.audio-player {
+  margin: 1rem auto;
+  max-width: 600px;
+  text-align: center;
+}
+
+.audio-player audio {
+  width: 100%;
+  border: 2px solid #d4af37;
+  border-radius: 8px;
+  padding: 8px;
+  background-color: #fffef8;
+}
+
+/* Citação bíblica */
+blockquote {
+  font-style: italic;
+  color: #4a3820;
+  margin-top: 1rem;
+}
+
+/* Estilização do menu flutuante */
+.dropdown-menu {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 9998;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 250px;
+}
+
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820; /* Cor do texto */
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #b38c1a;
+  color: white;
+}
+
+/* Link de volta para a página inicial */
+.back-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #4a3820;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+/* Garantia de display flex para o dropdown */
+.dropdown-menu {
+  display: none;
+  flex-direction: column;
+}
+
+/* Forçar display:flex quando ativo */
+.dropdown-menu.show {
+  display: flex;
+}
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820; /* Cor personalizada */
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  display: block;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: #b38c1a;
+  color: white;
+}
+.floating-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #d4af37;
+  color: #4a3820;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  font-size: 2rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  z-index: 9999;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.floating-btn:hover {
+  transform: scale(1.1);
+}
+
+.dropdown-menu {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 9998;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 250px;
+}
+
+.dropdown-item {
+  text-decoration: none;
+  color: #4a3820;
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #fffef8;
+  border: 1px solid #d4af37;
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.dropdown-item:hover {
+  background-color: #b38c1a;
+  color: white;
+}
+
+
+################################################################################
+### ARQUIVO: static/img/cristo_pantocrator.jpg
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/cristo_pantocrator.jpg
+
+
+################################################################################
+### ARQUIVO: static/img/terco/espirito_santo.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/espirito_santo.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/anunciacao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/anunciacao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/horto.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/horto.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/nascimento.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/nascimento.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/acoites.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/acoites.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/espinhos.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/espinhos.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/reino.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/reino.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/crucificacao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/crucificacao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/visitacao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/visitacao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/apresentacao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/apresentacao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/bodas.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/bodas.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/ascensao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/ascensao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/eucaristia.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/eucaristia.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/cruz.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/cruz.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/assuncao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/assuncao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/transfiguracao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/transfiguracao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/coroacao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/coroacao.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/templo.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/templo.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/batismo.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/batismo.png
+
+
+################################################################################
+### ARQUIVO: static/img/terco/ressurreicao.png
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/img/terco/ressurreicao.png
+
+
+################################################################################
+### ARQUIVO: static/text/salmo_22_10_playback.mp3
+################################################################################
+
+# Arquivo binário ou não legível como texto: static/text/salmo_22_10_playback.mp3
+
+
+################################################################################
+### ARQUIVO: static/text/salmos_links.txt
+################################################################################
+
+# Foram encontrados 189 links MP3 e 156 links DOC
+
+## Links MP3:
+http://www.portaldamusicacatolica.com.br/salmos/dn_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_3_exodo15.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_5_isaias12.mp3
+http://www.portaldamusicacatolica.com.br/salmos/isaias12.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_8_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_8.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_14_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_14.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_2_salmo15.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_16.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_17.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_6_salmo18.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18b.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21_7_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_10.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_10_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_9.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_9_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_24_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_7_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_24_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_24_6_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_4_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_3_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_28.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_28_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_28_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_29.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_4_salmo29.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_9.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_12.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_8.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_11.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_9.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_39_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_39_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_39.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_7_salmo41.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_45.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_46_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_46.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_50.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_50_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_53_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_53.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_61_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_61.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_62.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_64.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_65_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_66_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_66.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_67_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_68_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_68_3_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_70.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_71_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_71.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_77.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_77_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_5_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_6_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_84_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_84.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_85_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_90_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_90_3_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_91_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_92.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_92_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_92_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_6_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_7_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_5_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_6_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_99.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_6_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/vigiliapascal_1_salmo103.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_103_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_103.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_109.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_111.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_112.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_112_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_114_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_114_3_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_114.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_115_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_115_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_9.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_9_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_4_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_120_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_121_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_121_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_122.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_5_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_129_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_129_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_129_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_137_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_137.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_138_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_138_2_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_138.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_5.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_2.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_7.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_6.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_4.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_9.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_11.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_11_playback.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_3.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_8.mp3
+http://www.portaldamusicacatolica.com.br/salmos/salmo_147.mp3
+
+## Links DOC (Cifras):
+http://www.portaldamusicacatolica.com.br/salmos/dn_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/vigilia_pascal_7salmos.doc
+http://www.portaldamusicacatolica.com.br/salmos/responsorio_isaias12.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_8_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_8.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_14_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_14.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_15_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_16.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_17.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_18b.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_21_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_10.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_9.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_22_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_24_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_23_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_24_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_26_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_28.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_28_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_29.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_9.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_32_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_12.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_8.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_11.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_33_9.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_39_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_39.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_44_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_45.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_46_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_46.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_50.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_50_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_53_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_53.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_61_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_61.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_62.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_64.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_65_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_66_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_66.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_67_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_68_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_70.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_71_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_71.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_77.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_77_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_79_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_84_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_84.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_85_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_89_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_90_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_91_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_92.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_92_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_94.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_95_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_97_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_99.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_102_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_103_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_103.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_109.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_111.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_112.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_112_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_114_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_114.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_115_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_9.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_117_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_118_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_120_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_121_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_121_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_122.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_125_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_127_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_129_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_129_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_137_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_137.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_138_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_138.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_5.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_2.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_144_7.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_6.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_4.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_9.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_11.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_3.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_145_8.doc
+http://www.portaldamusicacatolica.com.br/salmos/salmo_147.doc
+
+
+################################################################################
+### ARQUIVO: static/text/extrator_links.py
+################################################################################
+
+# static/text/extrator_links.py
+
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import os
+
+# URL do site
+URL = 'http://www.portaldamusicacatolica.com.br/salmoonline_antigos.asp'
+
+# Caminho absoluto para salvar o arquivo
+OUTPUT_FILE = os.path.join(os.path.dirname(__file__), 'salmos_links.txt')
+
+# Headers realistas
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Accept-Encoding': 'gzip, deflate',
+    'Connection': 'keep-alive',
+    'Referer': 'http://www.google.com/',
+    'DNT': '1',
+}
+
+def gerar_lista_links():
+    print(f"[INFO] Acessando: {URL}")
+    try:
+        response = requests.get(URL, headers=HEADERS, timeout=15, allow_redirects=True)
+        response.raise_for_status()
+        print(f"[INFO] Status: {response.status_code}")
+    except requests.RequestException as e:
+        print(f"[ERRO] Falha ao acessar o site: {e}")
+        return
+
+    try:
+        soup = BeautifulSoup(response.content, 'html.parser')
+    except Exception as e:
+        print(f"[ERRO] Falha ao analisar o HTML: {e}")
+        return
+
+    # Extração de links MP3 e DOC
+    mp3_links = []
+    doc_links = []
+
+    for a in soup.find_all('a', href=True):
+        href = a['href'].strip()
+        if not href:
+            continue
+        full_url = urljoin(URL, href)
+        if full_url.lower().endswith('.mp3'):
+            mp3_links.append(full_url)
+        elif full_url.lower().endswith('.doc'):
+            doc_links.append(full_url)
+
+    # Remover duplicatas
+    mp3_links = list(dict.fromkeys(mp3_links))
+    doc_links = list(dict.fromkeys(doc_links))
+
+    # Salvar no arquivo
+    try:
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            f.write(f'# Foram encontrados {len(mp3_links)} links MP3 e {len(doc_links)} links DOC\n\n')
+            f.write('## Links MP3:\n')
+            for link in mp3_links:
+                f.write(link + '\n')
+            f.write('\n## Links DOC (Cifras):\n')
+            for link in doc_links:
+                f.write(link + '\n')
+
+        print(f"[SUCESSO] Arquivo '{OUTPUT_FILE}' gerado com {len(mp3_links)} MP3 e {len(doc_links)} DOC.")
+    except Exception as e:
+        print(f"[ERRO] Falha ao salvar o arquivo: {e}")
+
+if __name__ == "__main__":
+    gerar_lista_links()
+
+################################################################################
+### ARQUIVO: templates/pdf_template.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<style>
+  body {
+    font-family: "Georgia", serif;
+    padding: 40px;
+    color: #333;
+    background-color: #fffef8;
+  }
+  h1 {
+    text-align: center;
+    color: #6a4f28;
+    margin-bottom: 30px;
+  }
+  h2 {
+    color: #4a3820;
+    margin-top: 30px;
+  }
+  ul {
+    list-style-type: square;
+    padding-left: 20px;
+  }
+  .icon {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .icon img {
+    width: 120px;
+    border-radius: 10px;
+    border: 3px solid #d4af37;
+  }
+</style>
+</head>
+<body>
+  <div class="icon">
+    <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+  </div>
+
+  <h1>Exame de Consciência</h1>
+
+  {% for mandamento, lista in resultado.items() %}
+  <div class="section">
+    <h2>{{ mandamento }}</h2>
+    <ul>
+      {% for item in lista %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</body>
+</html>
+
+
+################################################################################
+### ARQUIVO: templates/terco.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Santo Rosário – Guia Completo</title>
+
+  <!-- Estilos únicos e organizados -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      background: #f9f9f9;
+      color: #333;
+      margin: 20px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h2, h3 {
+      color: #2c3e50;
+    }
+    .card-terco {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 3rem; /* 👈 Espaço de ~2 linhas entre cada mistério */
+      border-left: 5px solid #d4af37;
+    }
+    .card-terco h3 {
+      color: #4a3820;
+      font-weight: bold;
+      font-size: 1.4rem;
+    }
+    .titulo-terco {
+      font-size: 2rem;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #2c3e50;
+    }
+    .versiculo {
+      font-style: italic;
+      margin: 10px 0;
+      color: #555;
+      background-color: #e8f0ff;
+      padding: 1rem;
+      border-left: 3px solid #0056b3;
+      border-radius: 4px;
+    }
+    .explicacao, .meditacao {
+      margin: 10px 0 20px 0;
+      padding-left: 15px;
+      border-left: 3px solid #2980b9;
+      background: #eaf3fb;
+      color: #1b2a47;
+    }
+    .terco-imagem img {
+      max-width: 100%;
+      height: auto;
+      max-height: 250px;
+      object-fit: contain;
+      margin: 10px 0;
+      border-radius: 8px;
+    }
+    .terco-imagem {
+      text-align: center;
+    }
+    .introducao-rosario {
+      background: #d6eaf8;
+      border-left: 6px solid #2980b9;
+      padding: 25px 20px;
+      margin-bottom: 40px;
+    }
+    .passo-a-passo {
+      background-color: #f9f9f9;
+      padding: 1rem;
+      border-left: 3px solid #b38c1a;
+      border-radius: 4px;
+      font-style: italic;
+      color: #555;
+      margin-top: 1rem;
+    }
+    .contemplacao {
+      background-color: #f0fff0;
+      padding: 1rem;
+      border-left: 3px solid #228B22;
+      border-radius: 4px;
+      margin-top: 1rem;
+      font-style: italic;
+      color: #2a5d2e;
+    }
+    .audio-player {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .audio-player audio {
+      width: 100%;
+      max-width: 600px;
+      height: 50px;
+      border: 2px solid #d4af37;
+      border-radius: 8px;
+      padding: 5px;
+      background-color: #fffef8;
+    }
+    a.back-link {
+      display: inline-block;
+      margin-top: 40px;
+      color: #2980b9;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a.back-link:hover {
+      text-decoration: underline;
+    }
+    audio {
+      width: 100%;
+      margin: 15px 0;
+    }
+
+    /* Garantia extra de espaçamento entre itens da lista */
+    ol > li {
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body class="page-body">
+
+  <!-- Imagem Inicial -->
+  <div class="terco-imagem">
+    <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+  </div>
+
+  <!-- Título -->
+  <h1 class="titulo-terco">🕊️ SANTO ROSÁRIO – GUIA COMPLETO</h1>
+
+ <!-- Passos do Terço -->
+
+<div class="card-terco">
+  <h3>1. Sinal da Cruz</h3>
+  <p>Pelo sinal da santa cruz, livrai-nos, Deus, nosso Senhor, dos nossos inimigos. Em nome do Pai, e do Filho, e do Espírito Santo. Amém.</p>
+  <div class="passo-a-passo">
+    ✅ Toque a testa no "Pai", o peito no "Filho", o ombro esquerdo e depois o direito no "Espírito Santo".
+  </div>
+</div>
+
+<div class="card-terco">
+  <h3>2. Oferecimento do Terço</h3>
+  <p>
+    Divino Jesus, nós Vos oferecemos este terço que vamos rezar, meditando nos mistérios da nossa redenção.
+    Concedei-nos, pela intercessão da Virgem Maria, Mãe de Deus e nossa Mãe, as virtudes necessárias para
+    bem rezá-lo e a graça de alcançarmos as indulgências desta santa devoção.
+  </p>
+
+  <h4>📿 Intenções</h4>
+  <p>Oferecemos, particularmente:</p>
+  <ul>
+    <li>Em desagravo dos pecados cometidos contra o Santíssimo Coração de Jesus e o Imaculado Coração de Maria;</li>
+    <li>Pela paz no mundo e pela conversão dos pecadores;</li>
+    <li>Pelas almas do purgatório;</li>
+    <li>Pelas intenções do Papa Leão XIV;</li>
+    <li>Pelo aumento e santificação do clero;</li>
+    <li>Pelo nosso vigário;</li>
+    <li>Pela santificação e união das famílias;</li>
+    <li>Pelas missões e missionários;</li>
+    <li>Pelos enfermos e agonizantes;</li>
+    <li>Por todos que pediram nossas orações;</li>
+    <li>Por nossas intenções mais íntimas e urgentes;</li>
+    <li>Pelo Brasil.</li>
+  </ul>
+
+  <div class="passo-a-passo">
+    ✅ Reze com atenção e amor. Ofereça este terço por alguém especial.
+  </div>
+</div>
+
+<div class="card-terco">
+  <h3>3. Credo (Profissão de Fé)</h3>
+  <p>
+    <strong>Creio em Deus Pai todo-poderoso, criador do céu e da terra;</strong> e em Jesus Cristo, seu único Filho, nosso Senhor;
+    que foi concebido pelo poder do Espírito Santo, nasceu da Virgem Maria, padeceu sob Pôncio Pilatos, foi crucificado,
+    morto e sepultado, desceu à mansão dos mortos, ressuscitou ao terceiro dia, subiu aos céus, está sentado à direita
+    de Deus Pai todo-poderoso, donde há de vir a julgar os vivos e os mortos.
+  </p>
+  <p>
+    <strong>Creio no Espírito Santo,</strong> na santa Igreja Católica, na comunhão dos santos, na remissão dos pecados,
+    na ressurreição da carne, na vida eterna. Amém.
+  </p>
+  <div class="passo-a-passo">
+    ✅ Diga com fé: você está confessando sua crença em tudo que a Igreja ensina.
+  </div>
+</div>
+
+<div class="card-terco">
+  <h3>4. Pai-Nosso</h3>
+  <p><strong>Pai nosso que estais no céu,</strong> santificado seja o vosso nome;</p>
+  <p>venha a nós o vosso reino;</p>
+  <p>seja feita a vossa vontade, assim na terra como no céu;</p>
+  <p>o pão nosso de cada dia nos dai hoje;</p>
+  <p>perdoai-nos as nossas ofensas, assim como nós perdoamos a quem nos tem ofendido;</p>
+  <p>e não nos deixeis cair em tentação,</p>
+  <p>mas livrai-nos do mal. Amém.</p>
+  <div class="passo-a-passo">
+    ✅ Reze com atenção. Peça a Deus: "Que eu viva com santidade hoje."
+  </div>
+</div>
+
+<div class="card-terco">
+  <h3>5. Três Ave-Marias – Louvor à Santíssima Trindade</h3>
+  <p>Reze com devoção:</p>
+  <ul>
+    <li>Uma Ave-Maria em louvor a Deus Pai</li>
+    <li>Uma Ave-Maria em louvor a Deus Filho</li>
+    <li>Uma Ave-Maria em louvor ao Espírito Santo</li>
+  </ul>
+
+  <p class="opcional"><strong>📌 Oração do Angelus (opcional):</strong></p>
+  <p><strong>O Anjo do Senhor anunciou a Maria,</strong> e ela concebeu do Espírito Santo.</p>
+  <p>Ave Maria...</p>
+  <p><strong>Eis aqui a serva do Senhor,</strong> faça-se em mim segundo a Vossa palavra.</p>
+  <p>Ave Maria...</p>
+  <p><strong>E o Verbo de Deus se fez carne,</strong> e habitou entre nós.</p>
+  <p>Ave Maria...</p>
+  <p><strong>V.</strong> Rogai por nós, Santa Mãe de Deus.</p>
+  <p><strong>R.</strong> Para que sejamos dignos das promessas de Cristo.</p>
+  <p><strong>Amém.</strong></p>
+
+  <div class="passo-a-passo">
+    ✅ Reze as três Ave-Marias com atenção e amor. Se desejar, pode incluir a Oração do Angelus.
+  </div>
+</div>
+
+<div class="card-terco">
+  <h3>6. Ave-Marias (10 vezes por mistério)</h3>
+  <p>
+    <strong>Ave Maria, cheia de graça, o Senhor é convosco;</strong> bendita sois vós entre as mulheres,
+    e bendito é o fruto do vosso ventre, Jesus.
+  </p>
+  <p>
+    <strong>Santa Maria, Mãe de Deus,</strong> rogai por nós pecadores, agora e na hora da nossa morte. Amém.
+  </p>
+  <div class="passo-a-passo">
+    ✅ Reze 10 vezes por cada mistério, pedindo: "Santa Maria, ajude-me a viver como Jesus."
+  </div>
+</div>
+
+
+  <div class="card-terco">
+    <h3>7. GLÓRIA AO PAI</h3>
+    <p><strong>Glória ao Pai, ao Filho e ao Espírito Santo.</strong> Como era no princípio, agora e sempre. Amém.</p>
+    <div class="passo-a-passo">
+      ✅ Reze com alegria. Diga: "Eu agradeço a Deus por tudo!"
+    </div>
+  </div>
+
+  <div class="card-terco">
+    <h3>8. JACULATÓRIA</h3>
+    <p><strong>Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu e socorrei principalmente as que mais precisarem.</strong></p>
+    <div class="passo-a-passo">
+      ✅ Peça com fé. Pense nas pessoas que precisam de ajuda espiritual.
+    </div>
+  </div>
+
+<!-- SALVE RAINHA -->
+  <div class="card-terco">
+    <h3>🕊️ Salve Rainha</h3>
+    <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+    <p>Em nossas dores e angústias, nós aclamamos e suplicamos, pedindo teu olhar compassivo e tua poderosa intercessão junto ao teu Filho Jesus.</p>
+    <p><strong>Ó clemente, ó piedosa, ó doce sempre Virgem Maria!</strong></p>
+    <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+    <p>
+      <em>Maria, Mãe do Redentor e nossa Mãe, ajuda-nos a crescer em fé, esperança e amor, para sermos fiéis discípulos do teu Filho Jesus Cristo.</em>
+    </p>
+  </div>
+
+
+  <!-- MISTÉRIOS GOZOSOS -->
+  <div class="card-terco">
+    <h3>📜 Mistérios Gozosos</h3>
+    <div class="audio-player">
+      <audio controls>
+        <source src="{{ url_for('static', filename='audio/terco/goz.mp3') }}" type="audio/mpeg" />
+        Seu navegador não suporta o elemento de áudio.
+      </audio>
+    </div>
+    <ol>
+      <li>
+        <strong> A Anunciação do Anjo a Maria</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/anunciacao.png') }}" alt="Anunciação do Anjo a Maria" />
+        </div>
+        <div class="versiculo">Lc 1, 26-38 – “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.”</div>
+        <div class="explicacao">
+          <p>Na Anunciação, contemplamos o Verbo eterno que se faz carne no ventre da Virgem Maria, por obra do Espírito Santo. Maria, cheia de graça, responde com um “sim” confiante, acolhendo a vontade de Deus. Que, ao meditar este mistério, saibamos dizer como ela: “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.</p>
+        </div>
+        <div class="meditacao">
+        <p><strong>Ó Maria, humilde serva do Altíssimo,</strong><br>
+        escolhida para ser Mãe do Salvador, tu acolheste com fé o plano de Deus.<br>
+        Tu que disseste "sim" sem reservas, ensina-nos também a confiar, mesmo sem entender.<br>
+        Guia-nos no caminho da humildade, da obediência e do amor verdadeiro.<br>
+        Intercede por nós junto ao teu Filho, para que sejamos fiéis à vontade do Pai.<br>
+        Amém.</p>
+        </div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>A Visitação de Maria a Isabel</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/visitacao.png') }}" alt="Visitação de Maria a Isabel" />
+        </div>
+        <div class="versiculo">Lc 1, 39-45 – “Bendita és tu entre as mulheres...”</div>
+        <div class="explicacao">
+          <p>Ao visitar Isabel, Maria expressa a caridade cristã em ação...</p>
+        </div>
+        <div class="meditacao">Senhor, que possamos reconhecer e anunciar a tua presença em nossa vida com fé, humildade e amor, assim como Maria o fez.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>O Nascimento de Jesus em Belém</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/nascimento.png') }}" alt="Nascimento de Jesus em Belém" />
+        </div>
+        <div class="versiculo">Lc 2, 1-20 – “Nasceu para vós um Salvador, que é Cristo Senhor.”</div>
+        <div class="explicacao">
+          <p>O nascimento humilde de Jesus em Belém é a manifestação do Deus infinito em um pequeno e frágil menino. Deus se faz próximo, toca a nossa realidade humana e se apresenta como Salvador. Este mistério nos chama a reconhecer o divino nas situações simples e humildes de nossas vidas, e a acolher o Cristo que nasce em nossos corações.</p>
+        </div>
+        <div class="meditacao">Jesus, que nasceste entre nós em simplicidade e amor, ensina-nos a humildade e a disponibilidade para acolher-te em cada momento da nossa vida.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>A Apresentação de Jesus no Templo</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/apresentacao.png') }}" alt="Apresentação de Jesus no Templo" />
+        </div>
+        <div class="versiculo">Lc 2, 22-35 – “Este menino é sinal de contradição.”</div>
+        <div class="explicacao">
+          <p>Na apresentação, Jesus é consagrado a Deus segundo a Lei de Moisés. Simeão e Ana, homens e mulheres de fé profunda, reconhecem em Jesus a luz para revelação às nações e a glória do povo de Israel. Este mistério destaca a missão do Cristo como luz que ilumina as trevas e provoca decisões radicais, pois Ele é um sinal de contradição.</p>
+        </div>
+        <div class="meditacao">Senhor Jesus, ajuda-nos a ser luz no mundo, mesmo quando teu caminho nos desafia a enfrentar contradições e dificuldades.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>O Encontro de Jesus no Templo aos 12 anos</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/templo.png') }}" alt="Jesus no Templo aos 12 anos" />
+        </div>
+        <div class="versiculo">Lc 2, 41-52 – “Não sabíeis que devo estar na casa de meu Pai?”</div>
+        <div class="explicacao">
+          <p>Este episódio revela a consciência precoce de Jesus sobre sua missão divina. Mesmo na juventude, Ele se dedica ao diálogo com Deus no templo, deixando-nos o exemplo da busca constante pela sabedoria e intimidade com o Pai. Também nos recorda a importância de buscar discernimento em nossas vidas espirituais.</p>
+        </div>
+        <div class="meditacao">Espírito Santo, ilumina nossa mente e fortalece nosso coração para que, como Jesus, sejamos fiéis à vontade do Pai e busquemos sempre a verdade.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS DOLOROSOS -->
+  <div class="card-terco">
+    <h3>🔥 Mistérios Dolorosos</h3>
+    <strong>Jesus Agonia no Horto</strong>
+    <div class="terco-imagem">
+      <img src="{{ url_for('static', filename='img/terco/horto.png') }}" alt="Jesus Agonia no Horto" />
+      <div class="audio-player">
+        <audio controls>
+          <source src="{{ url_for('static', filename='audio/terco/dor.mp3') }}" type="audio/mpeg" />
+          Seu navegador não suporta o elemento de áudio.
+        </audio>
+      </div>
+    </div>
+    <ol>
+      <li>
+        
+        <div class="versiculo">Mt 26, 36-46 – “Meu Pai, se é possível, afaste de mim este cálice.”</div>
+        <div class="explicacao">
+          <p>Aqui vemos a humanidade dolorosa de Jesus diante do sofrimento iminente. Sua agonia é a entrega total ao mistério da paixão, na qual aceita livremente a vontade do Pai para a salvação do mundo. É o exemplo máximo de oração e abandono confiantes a Deus, mesmo em meio à angústia.</p>
+        </div>
+        <div class="meditacao">Jesus, Mestre da oração, ensina-nos a buscar força na intimidade com Deus e a entregar nossas dores à Sua vontade amorosa.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Jesus é Açoitado</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/acoites.png') }}" alt="Jesus é Açoitado" />
+        </div>
+        <div class="versiculo">Jo 19, 1-5 – “Eis o homem!”</div>
+        <div class="explicacao">
+          <p>O açoite sofrido por Jesus revela a injustiça e o sofrimento infligidos por amor a nós. É um momento que expressa o preço da redenção e o imenso amor que se entrega, apesar da dor e humilhação. Nos chama a reconhecer o valor do sacrifício e a união com Cristo na cruz.</p>
+        </div>
+        <div class="meditacao">Senhor, fortalece-nos na prova e ajuda-nos a carregar com amor as cruzes da vida, unindo-as ao teu sofrimento redentor.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Jesus é Coroado de Espinhos</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/espinhos.png') }}" alt="Jesus Coroado de Espinhos" />
+        </div>
+        <div class="versiculo">Jo 19, 2-3 – “Eles teceram uma coroa de espinhos e a puseram sobre a cabeça de Jesus.”</div>
+        <div class="explicacao">
+          <p>A coroa de espinhos simboliza o desprezo e o sofrimento que Jesus suportou por nós. É um sinal de sua realeza espiritual e do amor que vence o ódio. Este mistério nos convida a assumir a cruz com coragem, seguindo o Rei dos reis que se fez servo.</p>
+        </div>
+        <div class="meditacao">Rei crucificado, ensina-nos a humildade e o amor que se sacrificam pelo bem dos irmãos.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Jesus Carrega a Cruz</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/cruz.png') }}" alt="Jesus Carrega a Cruz" />
+        </div>
+        <div class="versiculo">Lc 23, 26-32 – “Tomai a vossa cruz e segui-me.”</div>
+        <div class="explicacao">
+          <p>No caminho do Calvário, Jesus nos mostra a entrega total, o amor que assume o sofrimento por amor ao Pai e aos homens. A cruz é o sinal da vitória definitiva sobre o pecado e a morte, e um chamado a segui-lo com fé e perseverança.</p>
+        </div>
+        <div class="meditacao">Senhor Jesus, ajuda-nos a carregar a cruz com esperança, imitando tua obediência e amor infinitos.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Jesus é Crucificado</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/crucificacao.png') }}" alt="Jesus é Crucificado" />
+        </div>
+        <div class="versiculo">Lc 23, 33-43 – “Pai, perdoa-lhes, porque não sabem o que fazem.”</div>
+        <div class="explicacao">
+          <p>Na cruz, Jesus nos revela o ápice do amor e do perdão, entregando sua vida para a salvação do mundo. Sua compaixão pelos que o crucificam é convite à conversão e à misericórdia verdadeira. Este mistério é a chave do cristianismo: amor que vence o ódio.</p>
+        </div>
+        <div class="meditacao">Senhor crucificado, ensina-nos a amar e perdoar como tu, mesmo em meio às dores da vida.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS GLORIOSOS -->
+    <div class="card-terco">
+    <h3>🕊️ Mistérios Gloriosos</h3>
+    <strong>Ressurreição de Jesus</strong>
+    <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/ressurreicao.png') }}" alt="Ressurreição de Jesus" />
+    </div>
+    <div class="audio-player">
+      <audio controls>
+        <source src="{{ url_for('static', filename='audio/terco/glo.mp3') }}" type="audio/mpeg" />
+        Seu navegador não suporta o elemento de áudio.
+      </audio>
+    </div>
+    <ol>
+      <li>
+        <div class="versiculo">Lc 24, 1-12 – “Ele não está aqui; ressuscitou!”</div>
+        <div class="explicacao">
+          <p>A Ressurreição é o centro da nossa fé: a vitória de Cristo sobre a morte e o pecado. Ela inaugura a nova criação e a esperança da vida eterna para todos os que creem. É a confirmação de que o amor divino é mais forte que a morte e que somos chamados à vida nova.</p>
+        </div>
+        <div class="meditacao">Jesus ressuscitado, enche-nos de esperança e alegria para vivermos na luz da tua vitória.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Ascensão de Jesus</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/ascensao.png') }}" alt="Ascensão de Jesus" />
+        </div>
+        <div class="versiculo">Mc 16, 19-20 – “O Senhor Jesus, depois de falar com eles, foi elevado ao céu.”</div>
+        <div class="explicacao">
+          <p>A Ascensão revela a exaltação de Cristo à direita do Pai, glorificado e Senhor de tudo. É o início da missão da Igreja no mundo, guiada pelo Espírito Santo, para levar a mensagem de salvação a todas as nações.</p>
+        </div>
+        <div class="meditacao">Senhor glorioso, ajuda-nos a ser testemunhas fiéis da tua palavra e promessas até os confins da terra.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Descida do Espírito Santo</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/espirito_santo.png') }}" alt="Descida do Espírito Santo" />
+        </div>
+        <div class="versiculo">At 2, 1-4 – “De repente, veio do céu um som como de um vento impetuoso.”</div>
+        <div class="explicacao">
+          <p>O Espírito Santo desce sobre os apóstolos, dando-lhes coragem e poder para anunciar o Evangelho. É o início da Igreja missionária e o dom que nos sustenta na fé e na caridade.</p>
+        </div>
+        <div class="meditacao">Espírito Santo, enche-nos de teus dons para que sejamos verdadeiros instrumentos de paz e amor.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Assunção de Maria</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/assuncao.png') }}" alt="Assunção de Maria" />
+        </div>
+        <div class="versiculo">Ap 12, 1 – “Apareceu no céu uma mulher revestida de sol, com a lua debaixo dos pés e uma coroa de doze estrelas na cabeça.”</div>
+        <div class="explicacao">
+          <p>A Assunção proclama que Maria, preservada de toda mancha de pecado, foi elevada em corpo e alma à glória celestial. Ela é o modelo da Igreja em sua esperança na ressurreição e na plenitude da vida eterna.</p>
+        </div>
+        <div class="meditacao">Mãe celeste, ensina-nos a confiar na promessa da vida eterna e a viver com os olhos fixos no céu.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Coroação de Maria</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/coroacao.png') }}" alt="Coroação de Maria" />
+        </div>
+        <div class="versiculo">Ap 12, 1 – “Vi uma mulher coroada com doze estrelas.”</div>
+        <div class="explicacao">
+          <p>Maria é coroada Rainha do Céu e da Terra, glorificada por seu papel único na história da salvação. Sua maternidade espiritual nos convida a buscar sua intercessão e a imitar suas virtudes para sermos participantes da glória divina.</p>
+        </div>
+        <div class="meditacao">Rainha do céu, guia-nos pelo caminho da santidade e faz-nos fiéis discípulos de teu Filho.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+    </ol>
+  </div>
+ 
+  <!-- MISTÉRIOS LUMINOSOS -->
+  <div class="card-terco">
+    <h3>💡 Mistérios Luminosos</h3>
+    <strong>Batismo de Jesus no Jordão</strong>
+    <div class="terco-imagem">
+      <img src="{{ url_for('static', filename='img/terco/batismo.png') }}" alt="Batismo de Jesus no Jordão" />
+      <div class="audio-player">
+        <audio controls>
+          <source src="{{ url_for('static', filename='audio/terco/lum.mp3') }}" type="audio/mpeg" />
+          Seu navegador não suporta o elemento de áudio.
+        </audio>
+      </div>
+    </div>
+    <ol>
+      <li>
+        <div class="versiculo">Mt 3, 13-17 – “Este é o meu Filho amado, em quem me comprazo.”</div>
+        <div class="explicacao">
+          <p>No Batismo, Jesus inaugura sua missão messiânica e nos mostra o caminho da obediência e da fidelidade ao Pai. É também a manifestação da Santíssima Trindade e o convite a uma vida nova no Espírito.</p>
+        </div>
+        <div class="meditacao">Pai amado, ajuda-nos a renovar nosso batismo, vivendo em fidelidade e entrega ao teu Filho Jesus.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Bodas de Caná</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/bodas.png') }}" alt="Bodas de Caná" />
+        </div>
+        <div class="versiculo">Jo 2, 1-11 – “Fazei tudo o que Ele vos disser.”</div>
+        <div class="explicacao">
+          <p>O primeiro milagre de Jesus revela sua glória e seu poder de transformação. Maria, intercedendo junto a Jesus, nos ensina a confiança na sua palavra e no seu agir em nossas vidas.</p>
+        </div>
+        <div class="meditacao">Mãe de Deus, ensina-nos a confiar sempre no teu Filho e a obedecer sua vontade.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Anúncio do Reino de Deus</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/reino.png') }}" alt="Anúncio do Reino de Deus" />
+        </div>
+        <div class="versiculo">Mt 4, 17 – “Arrependei-vos, porque o Reino dos Céus está próximo.”</div>
+        <div class="explicacao">
+          <p>Jesus proclama a chegada do Reino, chamando-nos à conversão e a uma vida nova. Este mistério nos chama a assumir uma postura ativa e comprometida com o Evangelho.</p>
+        </div>
+        <div class="meditacao">Senhor, converte nossos corações para vivermos na plenitude do teu Reino.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Transfiguração de Jesus</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/transfiguracao.png') }}" alt="Transfiguração de Jesus" />
+        </div>
+        <div class="versiculo">Mt 17, 1-9 – “Este é o meu Filho amado. Escutai-o.”</div>
+        <div class="explicacao">
+          <p>Na Transfiguração, Jesus revela sua divindade plena aos apóstolos, preparando-os para a paixão. É um chamado à fé e ao seguimento atento da palavra de Deus.</p>
+        </div>
+        <div class="meditacao">Senhor transfigurado, abre nossos olhos para ver tua glória e escutar tua voz.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+
+      <li>
+        <strong>Instituição da Eucaristia</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/eucaristia.png') }}" alt="Instituição da Eucaristia" />
+        </div>
+        <div class="versiculo">Lc 22, 19-20 – “Isto é o meu corpo, entregue por vós. Fazei isto em memória de mim.”</div>
+        <div class="explicacao">
+          <p>Na Última Ceia, Jesus nos dá o Sacramento da Eucaristia, verdadeiro memorial de seu sacrifício e presença real. É o dom maior para a vida da Igreja e de cada cristão.</p>
+        </div>
+        <div class="meditacao">Jesus sacramentado, ensina-nos a participar com fé e amor do teu banquete divino.</div>
+        <p><strong>Reze:</strong></p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 Pai Nosso</li>
+          <li>10 Ave Marias</li>
+          <li>1 Glória ao Pai</li>
+        </ul>
+        <div class="versiculo">
+          <strong>Ó meu Jesus</strong>, perdoai-nos, livrai-nos do fogo do inferno, levai as almas todas para o céu, e socorrei principalmente as que mais precisarem da vossa misericórdia.
+        </div>
+        <div class="versiculo">
+          <strong>Mãe de Deus</strong>, derramai sobre a humanidade inteira as graças eficazes de vossa chama de amor, agora e na hora de nossa morte. Amém.
+        </div>
+        <div class="versiculo">
+          <strong>Jesus, manso e humilde de coração</strong>, fazei dos nossos corações semelhantes ao vosso.
+        </div>
+        <div class="passo-a-passo">
+          ✅ Finalize este mistério com fé, recolhimento e confiança no amor de Deus e de Maria.
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- SALVE RAINHA -->
+  <div class="card-terco">
+    <h3>🕊️ Salve Rainha</h3>
+    <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+    <p>Em nossas dores e angústias, nós aclamamos e suplicamos, pedindo teu olhar compassivo e tua poderosa intercessão junto ao teu Filho Jesus.</p>
+    <p><strong>Ó clemente, ó piedosa, ó doce sempre Virgem Maria!</strong></p>
+    <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+    <p>
+      <em>Maria, Mãe do Redentor e nossa Mãe, ajuda-nos a crescer em fé, esperança e amor, para sermos fiéis discípulos do teu Filho Jesus Cristo.</em>
+    </p>
+  </div>
+
+  
+<!-- Introdução ao Rosário -->
+  <div class="card-terco">
+    <h2>🙏 Origem do Santo Rosário</h2>
+    <p>
+      O Rosário é uma das devoções mais queridas e difundidas na espiritualidade católica. Ele é uma oração contemplativa que convida o fiel a meditar profundamente os mistérios da vida de Jesus Cristo e de sua Santíssima Mãe, Maria, com o auxílio das orações tradicionais do Pai Nosso, Ave Maria e Glória ao Pai.
+    </p>
+    <p>
+      Historicamente, o Rosário tem raízes que remontam aos tempos medievais, com a prática dos monges de recitar as 150 Salmos. Para os fiéis leigos, que não sabiam ler, foi introduzido o costume de rezar 150 Ave Marias, divididas em grupos, formando assim o que viria a ser o Rosário.
+    </p>
+    <p>
+      A estrutura atual do Rosário foi consolidada por São Domingos de Gusmão, no século XIII, que, segundo a tradição, recebeu a devoção em uma aparição da Virgem Maria, pedindo que fosse difundida como um poderoso meio de conversão e oração.
+    </p>
+    <p>
+      O Rosário é também uma síntese do Evangelho, pois cada mistério reflete episódios centrais da vida de Cristo: sua Encarnação, Paixão, Ressurreição, entre outros. Através da repetição das orações, o fiel é convidado a entrar em um ritmo de contemplação que transforma a mente e o coração.
+    </p>
+    <p>
+      Grandes santos como São Luís Maria Grignion de Montfort, São João Paulo II e Santa Teresa de Ávila testemunharam o poder do Rosário em suas vidas espirituais, ensinando que esta oração não é apenas palavras repetidas, mas um caminho seguro para crescer em intimidade com Deus e com Maria.
+    </p>
+    <p>
+      São João Paulo II, em sua Carta Apostólica <em>Rosarium Virginis Mariae</em> (2002), destacou que o Rosário é um compêndio do Evangelho, “uma oração mariana que sempre foi profundamente cristocêntrica”. Ele incentivou os fiéis a redescobrir esta bela prática para fortalecer a fé, obter graças e perseverar no caminho da santidade.
+    </p>
+    <p>
+      Por isso, ao rezar o Rosário, somos convidados a imitar Maria, a humilde serva do Senhor, que meditou no seu coração todos os mistérios da salvação. É um convite para entrarmos no mistério divino, permitindo que a Palavra de Deus transforme a nossa vida.
+    </p>
+    <p>
+      Que esta meditação seja um caminho de paz, luz e renovação interior, levando cada um de nós a uma experiência viva do amor de Deus.
+    </p>
+  </div>
+  <a href="/" class="back-link">← Voltar ao Exame de Consciência</a>
+</body>
+</html>
+
+
+################################################################################
+### ARQUIVO: templates/salmos.html
+################################################################################
+
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Salmos e Cifras Sacras</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" type="image/x-icon">
+    <style>
+      body {
+        background-color: #0d0b14;
+        color: #e0cda9;
+        font-family: 'Times New Roman', serif;
+        margin: 0;
+        padding: 0;
+        line-height: 1.8;
+        background-image: linear-gradient(135deg, #1a1a2e 0%, #0e0e1a 100%);
+      }
+
+      header {
+        background-color: #161625;
+        color: gold;
+        text-align: center;
+        padding: 2.8rem 1rem;
+        border-bottom: 3px solid rgba(255, 215, 0, 0.6);
+        box-shadow: 0 4px 20px rgba(255, 215, 0, 0.1);
+      }
+
+      header h1 {
+        font-size: 2.8rem;
+        margin: 0;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 8px #000, 0 0 12px rgba(255, 215, 0, 0.5);
+      }
+
+      header p {
+        margin-top: 0.5rem;
+        font-style: italic;
+        color: #d4af37;
+      }
+
+      .container {
+        width: 90%;
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 2rem;
+      }
+
+      .salmo-item {
+        background-color: #1f1f33;
+        margin-bottom: 1.4rem;
+        padding: 1.6rem;
+        border-left: 6px solid gold;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      }
+
+      .salmo-item:hover {
+        transform: translateY(-4px);
+        background-color: #272741;
+        box-shadow: 0 8px 24px rgba(255, 215, 0, 0.15);
+      }
+
+      .salmo-nome {
+        font-size: 1.5rem;
+        color: #fffef7;
+        margin: 0 0 0.8rem 0;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px #000;
+      }
+
+      /* Player personalizado */
+      .audio-player {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background-color: #2d2d44;
+        padding: 0.8rem;
+        border-radius: 8px;
+        border: 1px solid #d4af37;
+        width: 100%;
+        max-width: 600px;
+        box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+      }
+
+      .play-btn {
+        background-color: #d4af37;
+        color: #0e0e1a;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+      }
+
+      .play-btn:hover {
+        background-color: #b8860b;
+        transform: scale(1.1);
+      }
+
+      .audio-info {
+        flex: 1;
+        font-size: 0.95rem;
+        color: #e0cda9;
+      }
+
+      .loading {
+        display: none;
+        color: #d4af37;
+        font-style: italic;
+        margin-left: 10px;
+      }
+
+      .download-group {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+      }
+
+      .btn {
+        background-color: #d4af37;
+        color: #0e0e1a;
+        border: none;
+        padding: 0.6rem 1.1rem;
+        font-weight: bold;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn:hover {
+        background-color: #b8860b;
+        color: white;
+        transform: scale(1.05);
+      }
+
+      .empty-state {
+        text-align: center;
+        color: #a0a0b0;
+        font-style: italic;
+        padding: 3rem;
+      }
+
+      footer {
+        text-align: center;
+        padding: 2rem;
+        margin-top: 3rem;
+        color: #b8a594;
+        font-size: 0.9rem;
+        border-top: 1px solid gold;
+      }
+    </style>
+  </head>
+  <body>
+
+    <header>
+      <h1>🎵 Salmos e Cifras Sacras</h1>
+      <p>Para Adoração, Liturgia e Oração Contínua</p>
+    </header>
+
+    <div class="container">
+
+      {% if salmos %}
+        {% for salmo in salmos %}
+          <div class="salmo-item">
+            <h3 class="salmo-nome">{{ salmo['nome'] }}</h3>
+
+            <!-- Player personalizado -->
+            <div class="audio-player">
+              <button class="play-btn" onclick="togglePlay(this, '{{ url_for('play_salmo', filename=salmo.filename) }}')">
+                ▶
+              </button>
+              <div class="audio-info">
+                <div>{{ salmo.nome }}</div>
+                <div class="loading" id="loading-{{ salmo['id'] }}">Carregando...</div>
+              </div>
+            </div>
+
+            <!-- Botões de download -->
+            <div class="download-group">
+              <a href="{{ url_for('download_mp3', filename=salmo.filename) }}" class="btn">
+                ⬇️ Baixar MP3
+              </a>
+              <a href="{{ url_for('download_doc', filename=salmo.filename) }}" class="btn">
+                📄 Baixar Cifra
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <p>Nenhum salmo disponível no momento.</p>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <script>
+      function togglePlay(button, streamUrl) {
+        // Encontra o player de áudio atual
+        const container = button.closest('.audio-player');
+        const loading = container.querySelector('.loading');
+        let audio = container.querySelector('audio');
+
+        if (!audio) {
+          // Primeiro clique: cria o áudio
+          audio = new Audio();
+          container.appendChild(audio);
+          audio.src = streamUrl;
+
+          // Mostra loading
+          loading.style.display = 'block';
+
+          audio.oncanplay = () => {
+            loading.style.display = 'none';
+            audio.play();
+            button.innerHTML = '❚❚';
+          };
+
+          audio.onerror = () => {
+            loading.style.display = 'none';
+            alert('Erro ao carregar o áudio. Tente novamente.');
+          };
+
+          audio.onended = () => {
+            button.innerHTML = '▶';
+          };
+
+        } else if (audio.paused) {
+          // Continua reprodução
+          loading.style.display = 'block';
+          audio.play().then(() => {
+            loading.style.display = 'none';
+            button.innerHTML = '❚❚';
+          }).catch(err => {
+            loading.style.display = 'none';
+            console.error("Erro ao reproduzir:", err);
+            alert("Falha ao reproduzir áudio.");
+          });
+        } else {
+          // Pausa
+          audio.pause();
+          button.innerHTML = '▶';
+        }
+      }
+    </script>
+
+    <footer>
+      &copy; {{ ano }} Portal da Música Católica.<br>
+      "Teu amor, Senhor, é eterno: não abandones a obra das tuas mãos." — Salmo 137(138),8
+    </footer>
+
+  </body>
+  </html>
+
+################################################################################
+### ARQUIVO: templates/backup.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meditações Teológicas dos Mistérios do Rosário</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      background: #f9f9f9;
+      color: #333;
+      margin: 20px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h2, h3 {
+      color: #2c3e50;
+    }
+    .card-terco {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .versiculo {
+      font-style: italic;
+      margin: 10px 0;
+      color: #555;
+    }
+    .explicacao, .meditacao {
+      margin: 10px 0 20px 0;
+      padding-left: 15px;
+      border-left: 3px solid #2980b9;
+      background: #eaf3fb;
+      color: #1b2a47;
+    }
+    .terco-imagem img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .introducao-rosario {
+      background: #d6eaf8;
+      border-left: 6px solid #2980b9;
+      padding: 25px 20px;
+      margin-bottom: 40px;
+    }
+    a.back-link {
+      display: inline-block;
+      margin-top: 40px;
+      color: #2980b9;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    a.back-link:hover {
+      text-decoration: underline;
+    }
+    audio {
+      width: 100%;
+      margin: 15px 0;
+    }
+    .oracoes-misterio {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f1f9f1;
+      border-left: 4px solid #27ae60;
+      font-size: 0.95rem;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="titulo-terco">🕊️ SANTO ROSÁRIO – GUIA COMPLETO</h1>
+
+  <!-- INTRODUÇÃO AO ROSÁRIO -->
+  <div class="card-terco introducao-rosario">
+    <h2>🙏 Introdução ao Santo Rosário</h2>
+    <p>O Rosário é uma das devoções mais queridas e difundidas na espiritualidade católica. Ele é uma oração contemplativa que convida o fiel a meditar profundamente os mistérios da vida de Jesus Cristo e de sua Santíssima Mãe, Maria...</p>
+    <!-- Conteúdo da introdução omitido para brevidade -->
+  </div>
+
+  <!-- MISTÉRIOS GOZOSOS -->
+  <div class="card-terco">
+    <h3>📜 Mistérios Gozosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/goz.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. A Anunciação do Anjo a Maria</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/anunciacao.png') }}" alt="Anunciação do Anjo a Maria" />
+        </div>
+        <div class="versiculo">Lc 1, 26-38 – “Eis aqui a serva do Senhor; faça-se em mim segundo a tua palavra.”</div>
+        <div class="explicacao">
+          <p>Na Anunciação, contemplamos o momento sublime em que o Verbo eterno se faz carne por obra do Espírito Santo...</p>
+        </div>
+        <div class="meditacao">
+          Ó Maria, humilde serva do Altíssimo, ajuda-nos a imitar tua docilidade e confiança em Deus...
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios gozosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS DOLOROSOS -->
+  <div class="card-terco">
+    <h3>🔥 Mistérios Dolorosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/dor.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Jesus Agonia no Horto</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/horto.png') }}" alt="Jesus Agonia no Horto" />
+        </div>
+        <div class="versiculo">Mt 26, 36-46 – “Meu Pai, se é possível, afaste de mim este cálice.”</div>
+        <div class="explicacao">
+          <p>Aqui vemos a humanidade dolorosa de Jesus diante do sofrimento iminente...</p>
+        </div>
+        <div class="meditacao">
+          Jesus, Mestre da oração, ensina-nos a buscar força na intimidade com Deus...
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios dolorosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS GLORIOSOS -->
+  <div class="card-terco">
+    <h3>🕊️ Mistérios Gloriosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/glo.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Ressurreição de Jesus</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/ressurreicao.png') }}" alt="Ressurreição de Jesus" />
+        </div>
+        <div class="versiculo">Lc 24, 1-12 – “Ele não está aqui; ressuscitou!”</div>
+        <div class="explicacao">
+          <p>A Ressurreição é o centro da nossa fé: a vitória de Cristo sobre a morte e o pecado...</p>
+        </div>
+        <div class="meditacao">
+          Jesus ressuscitado, enche-nos de esperança e alegria para vivermos na luz da tua vitória.
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios gloriosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- MISTÉRIOS LUMINOSOS -->
+  <div class="card-terco">
+    <h3>💡 Mistérios Luminosos</h3>
+    <audio controls>
+      <source src="{{ url_for('static', filename='audio/terco/lum.mp3') }}" type="audio/mpeg" />
+      Seu navegador não suporta o elemento de áudio.
+    </audio>
+    <ol>
+      <li>
+        <strong>1. Batismo de Jesus no Jordão</strong>
+        <div class="terco-imagem">
+          <img src="{{ url_for('static', filename='img/terco/batismo.png') }}" alt="Batismo de Jesus no Jordão" />
+        </div>
+        <div class="versiculo">Mt 3, 13-17 – “Este é o meu Filho amado, em quem me comprazo.”</div>
+        <div class="explicacao">
+          <p>No Batismo, Jesus inaugura sua missão messiânica e nos mostra o caminho da obediência e da fidelidade ao Pai...</p>
+        </div>
+        <div class="meditacao">
+          Pai amado, ajuda-nos a renovar nosso batismo, vivendo em fidelidade e entrega ao teu Filho Jesus.
+        </div>
+        <div class="oracoes-misterio">
+          <p><strong>Reze:</strong></p>
+          <ul>
+            <li>1 Pai Nosso</li>
+            <li>10 Ave Marias</li>
+            <li>1 Glória ao Pai</li>
+            <li>Jaculatória: "Ó meu Jesus, perdoai-nos, livrai-nos do fogo do inferno..."</li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Outros mistérios luminosos omitidos para brevidade -->
+    </ol>
+  </div>
+
+  <!-- SALVE RAINHA -->
+  <div class="card-terco">
+    <h3>🕊️ Salve Rainha</h3>
+    <p><strong>Salve, Rainha, Mãe de misericórdia,</strong> vida, doçura e esperança nossa, salve!</p>
+    <p>Em nossas dores e angústias, nós aclamamos e suplicamos...</p>
+    <p><strong>Rogai por nós, Santa Mãe de Deus,</strong> para que sejamos dignos das promessas de Cristo. Amém.</p>
+  </div>
+
+  <a href="/" class="back-link">← Voltar ao Exame de Consciência</a>
+</body>
+</html>
+
+
+################################################################################
+### ARQUIVO: templates/liturgia.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ titulo }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .card-liturgia {
+      margin-bottom: 2rem;
+      border-left: 5px solid #d4af37;
+      background-color: #fffef8;
+      padding: 1.5rem;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      line-height: 1.6;
+    }
+    .card-liturgia h3 {
+      color: #4a3820;
+      font-weight: bold;
+      font-size: 1.5rem;
+    }
+    .titulo-dia {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #6a4f28;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .subtitulo {
+      font-style: italic;
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #555;
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 1rem;
+      color: #4a3820;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .audio-player {
+      margin: 1rem auto;
+      max-width: 600px;
+      text-align: center;
+    }
+    .mt-3 {
+      margin-top: 1rem;
+    }
+    /* Estilo para lista de áudios */
+    .lista-audios {
+      margin: 1rem 0;
+    }
+    .item-audio {
+      margin-bottom: 1.5rem;
+      padding: 0.8rem;
+      border: 1px solid #e0d8c8;
+      border-radius: 8px;
+      background-color: #fffef8;
+    }
+    .item-audio strong {
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    .botoes-download {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .botoes-download a {
+      margin-right: 1rem;
+      color: #8B4513;
+      text-decoration: none;
+    }
+    .botoes-download a:last-child {
+      margin-right: 0;
+    }
+    .botoes-download a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body class="page-body">
+  <div class="container my-5">
+    <div class="icon">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+
+    <div class="titulo-dia">{{ titulo }}</div>
+    <div class="subtitulo">Cor Litúrgica: {{ cor }} — {{ data }}</div>
+
+    {% if antifonas.entrada %}
+    <div class="card-liturgia">
+      <h3>🔸 Antífona de Entrada</h3>
+      <p>{{ antifonas.entrada }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card-liturgia">
+      <h3>🙏 Oração do Dia</h3>
+      <p>{{ dia }}</p>
+    </div>
+
+    <div class="card-liturgia">
+      <h3>📖 Primeira Leitura</h3>
+      <p><strong>{{ primeiraLeitura.referencia }}</strong> – {{ primeiraLeitura.titulo }}</p>
+      <p>{{ primeiraLeitura.texto }}</p>
+    </div>
+
+    {% if segundaLeitura and "Não há" not in segundaLeitura %}
+    <div class="card-liturgia">
+      <h3>📘 Segunda Leitura</h3>
+      <p>{{ segundaLeitura }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card-liturgia">
+      <h3>🎶 Salmo Responsorial do Dia</h3>
+      <p><strong>{{ salmo.referencia }}</strong></p>
+      <p><em>Refrão: {{ salmo.refrao }}</em></p>
+      <p>{{ salmo.texto.replace('—', '<br>—') | safe }}</p>
+
+      <!-- === PLAYER DE SALMOS DO DIA (MÚLTIPLAS VERSÕES) === -->
+      {% if salmos_do_dia %}
+      <div class="lista-audios">
+        <p><small>🔊 Clique para ouvir e escolher a versão:</small></p>
+        {% for salmo in salmos_do_dia %}
+        <div class="item-audio">
+          <strong>{{ formatar_nome_salmo(salmo.filename) }}</strong>
+          <div class="audio-player">
+            <audio controls style="width: 100%;">
+              <source src="{{ url_for('play_salmo', filename=salmo.filename) }}" type="audio/mpeg">
+              Seu navegador não suporta áudio.
+            </audio>
+          </div>
+          <div class="botoes-download">
+            <a href="{{ url_for('download_mp3', filename=salmo.filename) }}">⬇️ Baixar MP3</a>
+            <a href="{{ url_for('download_doc', filename=salmo.filename) }}">📄 Baixar Cifra</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p><small><em>Nenhuma gravação disponível para este salmo.</em></small></p>
+      {% endif %}
+    </div>
+
+    <div class="card-liturgia">
+      <h3>✠ Evangelho</h3>
+      <p><strong>{{ evangelho.referencia }}</strong> – {{ evangelho.titulo }}</p>
+      <p>{{ evangelho.texto }}</p>
+    </div>
+
+    <div class="card-liturgia">
+      <h3>🕊️ Ofertório</h3>
+      <p>{{ oferendas }}</p>
+    </div>
+
+    <div class="card-liturgia">
+      <h3>💟 Comunhão</h3>
+      <p>{{ comunhao }}</p>
+    </div>
+
+    {% if antifonas.comunhao %}
+    <div class="card-liturgia">
+      <h3>🎶 Antífona de Comunhão</h3>
+      <p>{{ antifonas.comunhao }}</p>
+    </div>
+    {% endif %}
+
+    <a href="/" class="back-link">← Voltar</a>
+  </div>
+</body>
+</html>
+
+################################################################################
+### ARQUIVO: templates/index.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exame de Consciência</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <style>
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+      textarea.form-control {
+        width: 100% !important;
+        font-size: 1rem;
+      }
+      .btn {
+        width: 100%;
+        font-size: 1rem;
+      }
+    }
+
+    .audio-player {
+      display: none;
+      margin: 1rem auto;
+      max-width: 600px;
+      text-align: center;
+    }
+
+    .audio-player audio {
+      width: 100%;
+      border: 2px solid #d4af37;
+      border-radius: 8px;
+      padding: 8px;
+      background-color: #fffef8;
+    }
+  </style>
+</head>
+<body class="page-body">
+
+<!-- Player de Áudio Oculto -->
+<audio id="audio" loop>
+  <source src="{{ url_for('static', filename='audio/miserere_mei_deus.mp3') }}" type="audio/mpeg">
+  Seu navegador não suporta o elemento de áudio.
+</audio>
+
+<!-- Conteúdo Principal -->
+<div class="container my-5">
+  <div class="icon">
+    <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+  </div>
+  <h1 class="title">📜 Exame de Consciência</h1>
+  <form method="POST" id="form-pecados">
+    {% for mandamento, lista in pecados.items() %}
+    <div class="card mb-3 card-section">
+      <div class="card-header fw-bold section-title">{{ mandamento }}</div>
+      <div class="card-body">
+        {% for pecado in lista %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="{{ mandamento }}" value="{{ loop.index0 }}" id="{{ mandamento }}-{{ loop.index0 }}" />
+          <label class="form-check-label" for="{{ mandamento }}-{{ loop.index0 }}">{{ pecado }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="mb-3">
+      <label for="custom" class="form-label fw-bold">Outro(s) pecado(s) que deseja digitar:</label>
+      <textarea class="form-control" id="custom" name="custom" rows="3" placeholder="Digite livremente..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Gerar minha lista</button>
+  </form>
+
+  {% if resultado %}
+  <hr class="my-5" />
+  <h2 class="section-title">📄 Seus pecados selecionados:</h2>
+  <form method="POST" action="/download" id="form-download">
+    <input type="hidden" name="html_conteudo" id="html_conteudo" />
+
+    <ul class="list-group my-3 list-peccados">
+      {% for mandamento, lista in resultado.items() %}
+      <li class="list-group-item list-header">{{ mandamento }}</li>
+      {% for item in lista %}
+      <li class="list-group-item list-item">{{ item }}</li>
+      {% endfor %}
+      {% endfor %}
+    </ul>
+
+    <button type="submit" class="btn btn-success">📅 Baixar lista como PDF</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Script para geração do PDF -->
+<script>
+  document.getElementById('form-download')?.addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    let listaHTML = `<div class="icon">
+      <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+    </div>
+    <h1>Exame de Consciência</h1>`;
+
+    {% for mandamento, lista in resultado.items() %}
+      listaHTML += `<h2>{{ mandamento }}</h2><ul>`;
+      {% for item in lista %}
+        listaHTML += `<li>{{ item }}</li>`;
+      {% endfor %}
+      listaHTML += "</ul>";
+    {% endfor %}
+
+    const css = `
+      body {
+        font-family: Georgia, serif;
+        padding: 40px;
+        color: #333;
+        background-color: #fffef8;
+      }
+      h1 {
+        text-align: center;
+        color: #6a4f28;
+        margin-bottom: 30px;
+      }
+      h2 {
+        color: #4a3820;
+        margin-top: 30px;
+      }
+      ul {
+        list-style-type: square;
+        padding-left: 20px;
+      }
+      .icon {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .icon img {
+        width: 120px;
+        border-radius: 10px;
+        border: 3px solid #d4af37;
+      }
+    `;
+
+    document.getElementById('html_conteudo').value = `
+      <!DOCTYPE html>
+      <html lang="pt-br">
+      <head>
+        <meta charset="UTF-8" />
+        <style>${css}</style>
+      </head>
+      <body>
+        ${listaHTML}
+      </body>
+      </html>
+    `;
+
+    this.submit();
+  });
+</script>
+
+<!-- Botão Flutuante -->
+<style>
+  .floating-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #d4af37;
+    color: #4a3820;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 9999;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .floating-btn:hover {
+    transform: scale(1.1);
+  }
+
+  .dropdown-menu {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 9998;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    width: 250px;
+  }
+
+  .dropdown-item {
+    text-decoration: none;
+    color: #4a3820;
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 6px;
+    background-color: #fffef8;
+    border: 1px solid #d4af37;
+    transition: all 0.2s ease;
+  }
+
+  .dropdown-item:hover {
+    background-color: #b38c1a;
+    color: white;
+  }
+</style>
+
+<!-- Botão Flutuante -->
+<button id="floatingBtn" class="floating-btn">📖</button>
+
+<!-- Menu Suspenso -->
+<div id="dropdownMenu" class="dropdown-menu">
+  <a href="/oracoes#Ato-de-Contricao" class="dropdown-item">Ato de Contrição</a>
+  <a href="/liturgia" class="dropdown-item">Liturgia do Dia</a>
+  <a href="/terco" class="dropdown-item">Santo Rosário</a> 
+  <a href="/oracoes#Oracao-do-Arrependimento" class="dropdown-item">Oração do Arrependimento</a>
+  <a href="/oracoes#Confissao-Geral" class="dropdown-item">Confissão Geral</a>
+  <a href="/oracoes#Miserere-Mei-Deus" class="dropdown-item">Miserere Mei Deus</a>
+  <a href="/oracoes#Do-Profundo" class="dropdown-item">Do Profundo</a>
+  <a href="/oracoes#Salmo-6" class="dropdown-item">Salmo 6</a>
+  <a href="/oracoes#Oracao-a-Virgem-Maria" class="dropdown-item">Oração à Virgem Maria</a>
+  <a href="/salmos#Salmos-e-Cifras-Sacras" class="dropdown-item">Salmos e Cifras Sacras</a>
+  
+</div>
+
+<!-- Script para tocar áudio na primeira interação -->
+<script>
+  let audioTocado = false;
+  const audio = document.getElementById('audio');
+
+  function initAudio() {
+    if (!audioTocado && audio) {
+      audio.muted = true; // Começa mudo para evitar bloqueio
+      audio.play()
+        .then(() => {
+          console.log("Áudio iniciado com sucesso");
+          audio.muted = false; // Remove o mudo após iniciar
+          audioTocado = true;
+        })
+        .catch(err => {
+          console.error("Erro ao tocar o áudio:", err);
+        });
+    }
+  }
+
+  window.addEventListener('click', initAudio);
+  window.addEventListener('touchstart', initAudio);
+</script>
+<!-- Script para mostrar/ocultar menu flutuante -->
+<script>
+  const btn = document.getElementById('floatingBtn');
+  const dropdown = document.getElementById('dropdownMenu');
+
+  btn.addEventListener('click', () => {
+    dropdown.style.display = dropdown.style.display === 'flex' ? 'none' : 'flex';
+  });
+
+  window.addEventListener('click', (e) => {
+    if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    let audioTocado = false;
+    const audio = document.getElementById('audio');
+
+    function initAudio() {
+      if (!audioTocado && audio && audio.src) {
+        audio.muted = true;
+        audio.play()
+          .then(() => {
+            console.log("Áudio iniciado com sucesso");
+            audio.muted = false;
+            audioTocado = true;
+          })
+          .catch(err => {
+            console.error("Erro ao iniciar o áudio:", err);
+          });
+      }
+    }
+
+    // Clique em qualquer lugar da página
+    window.addEventListener('click', initAudio);
+    window.addEventListener('touchstart', initAudio);
+
+    // Clique no menu flutuante também conta como interação
+    const floatingBtn = document.getElementById('floatingBtn');
+    if (floatingBtn) {
+      floatingBtn.addEventListener('click', initAudio);
+    }
+  });
+</script>
+</body>
+</html>
+
+
+################################################################################
+### ARQUIVO: templates/oracoes.html
+################################################################################
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Orações Católicas</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .card-oracao {
+      margin-bottom: 2rem;
+      border-left: 5px solid #d4af37;
+      background-color: #fffef8;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    .card-oracao h3 {
+      color: #4a3820;
+      font-weight: bold;
+    }
+
+    .descricao {
+      font-style: italic;
+      color: #666;
+      margin-bottom: 1rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 1rem;
+      color: #4a3820;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body class="page-body">
+
+<div class="container my-5">
+  <div class="icon">
+    <img src="{{ url_for('static', filename='img/cristo_pantocrator.jpg') }}" alt="Cristo Pantocrator" />
+  </div>
+
+  <h1 class="title">📖 Orações Católicas</h1>
+
+  {% for oracao in oracoes %}
+  <div class="card-oracao" id="{{ oracao.titulo | replace(' ', '-') | replace('à', 'a') | replace('á','a') | replace('é','e') | replace('í','i') | replace('ó','o') | replace('ú','u') | replace('ç','c') }}">
+    <h3>{{ oracao.titulo }}</h3>
+    {% if oracao.descricao %}
+    <p class="descricao">{{ oracao.descricao }}</p>
+    {% endif %}
+    <p>{{ oracao.texto }}</p>
+  </div>
+  {% endfor %}
+
+  <a href="/" class="back-link">← Voltar ao Exame de Consciência</a>
+</div>
+
+</body>
+</html>
+
